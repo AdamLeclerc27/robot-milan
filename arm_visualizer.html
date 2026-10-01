@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulateur 3D - Bras Robot 6-DOF (Milan 2)</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #11141c;
+            color: #e0e6ed;
+            overflow: hidden;
+            display: flex;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            flex: 1;
+            height: 100%;
+            position: relative;
+        }
+
+        #panel {
+            width: 380px;
+            background: rgba(22, 27, 39, 0.95);
+            border-left: 1px solid #2e384d;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 1.3rem;
+            color: #4da3ff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 2px solid #2a364f;
+            padding-bottom: 10px;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8da2c0;
+            margin-top: 5px;
+        }
+
+        .pose-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .btn {
+            background: #2a364f;
+            color: #ffffff;
+            border: 1px solid #3d4f73;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            background: #3b4e73;
+            border-color: #5572aa;
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-park { background: #5c3826; border-color: #8a5338; }
+        .btn-park:hover { background: #734630; }
+        .btn-grab { background: #23543d; border-color: #35805d; }
+        .btn-grab:hover { background: #2e6e50; }
+
+        .slider-group {
+            background: #19202e;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #243047;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .slider-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+        }
+
+        .slider-header span.val {
+            font-weight: bold;
+            color: #4da3ff;
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #2e3a52;
+            outline: none;
+            cursor: pointer;
+            accent-color: #4da3ff;
+        }
+
+        .coords-box {
+            background: #0f141f;
+            border: 1px dashed #30405d;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            color: #a4c2f4;
+        }
+
+        #overlay-tips {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(15, 20, 31, 0.85);
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid #243047;
+            font-size: 0.8rem;
+            color: #9ab;
+            pointer-events: none;
+        }
+    </style>
+    <!-- Three.js + OrbitControls depuis un CDN fiable -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <div id="overlay-tips">
+            🖱️ <b>Souris :</b> Clic gauche = pivoter la vue 3D | Clic droit = déplacer | Molette = zoomer
+        </div>
+    </div>
+
+    <div id="panel">
+        <h1>🦾 Milan 2 - Corps & Bras</h1>
+
+        <div style="background:#19202e; border: 1px solid #2a3a54; border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
+            <span>📍 <b>Configuration :</b> Torse avant</span>
+            <span style="color: #00ff88; font-weight: bold;">Hauteur = 15 cm</span>
+        </div>
+
+        <div id="safety-badge" style="background:#14291c; border: 1px solid #2e7d32; border-radius: 8px; padding: 8px 12px; font-size: 0.8rem; color:#81c784; display: flex; align-items: center; justify-content: center; text-align: center; transition: all 0.2s ease;">
+            🛡️ Protection Anti-Collision active (Sol & Corps protégés)
+        </div>
+
+        <div class="section-title">📍 Poses Clés Indispensables</div>
+        <div class="pose-grid">
+            <button class="btn btn-park" onclick="applyPose('park_compact')">📦 PARK (Plaqué au corps)</button>
+            <button class="btn btn-grab" onclick="applyPose('ground_grab')">🎯 RAMASSER SOL (15-20cm)</button>
+            <button class="btn" style="background:#283593; border-color:#3949ab;" onclick="applyPose('eye_level')">👀 HAUTEUR YEUX / TÊTE (50cm)</button>
+            <button class="btn" onclick="applyPose('forward_reach')">👉 TENDRE DEVANT (Mi-corps)</button>
+            <button class="btn" onclick="applyPose('home')">🏠 NEUTRE (Prêt)</button>
+            <button class="btn" style="background:#424242;" onclick="applyPose('relax_down')">🛋️ BAISSÉ AU REPOS</button>
+        </div>
+
+        <div class="section-title">🤏 Contrôle Pince</div>
+        <div class="pose-grid">
+            <button class="btn" onclick="setGripper(20)">👐 Ouvrir (20°)</button>
+            <button class="btn" onclick="setGripper(85)">✊ Fermer (85°)</button>
+        </div>
+
+        <div class="section-title">🚗 Déplacement & Ligne Droite (Anti-Banane)</div>
+        <div class="slider-group">
+            <div style="display:flex; justify-content:center; gap:6px; margin-bottom:4px;">
+                <button class="btn" style="width:52px; height:42px; font-size:1.1rem;" onpointerdown="startDrive('forward')" onpointerup="stopDrive()" onpointerleave="stopDrive()">▲</button>
+            </div>
+            <div style="display:flex; justify-content:center; gap:6px;">
+                <button class="btn" style="width:52px; height:42px; font-size:1.1rem;" onpointerdown="startDrive('left')" onpointerup="stopDrive()" onpointerleave="stopDrive()">◄</button>
+                <button class="btn" style="width:52px; height:42px; background:#c62828; font-size:1.1rem;" onclick="stopDrive()">⏹️</button>
+                <button class="btn" style="width:52px; height:42px; font-size:1.1rem;" onpointerdown="startDrive('right')" onpointerup="stopDrive()" onpointerleave="stopDrive()">►</button>
+            </div>
+            <div style="display:flex; justify-content:center; gap:6px; margin-top:4px;">
+                <button class="btn" style="width:52px; height:42px; font-size:1.1rem;" onpointerdown="startDrive('backward')" onpointerup="stopDrive()" onpointerleave="stopDrive()">▼</button>
+            </div>
+
+            <!-- Paramètre Anti-Banane -->
+            <div style="margin-top:8px; border-top:1px solid #2a3a54; padding-top:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:0.8rem; font-weight:600;">Correcteur Ligne Droite :</span>
+                    <button id="btn-toggle-correct" class="btn" style="background:#2e7d32; padding:4px 8px; font-size:0.75rem;" onclick="toggleHeadingHold()">🟢 ACTIF</button>
+                </div>
+                <div style="font-size:0.75rem; color:#8da2c0; margin-top:4px;">
+                    Élimine le biais des moteurs pour rouler droit comme une flèche.
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:6px;">
+                    <button class="btn" style="font-size:0.75rem; padding:4px 8px; flex:1;" onclick="resetRobotPosition()">🔄 Centrer Robot</button>
+                    <button class="btn" style="font-size:0.75rem; padding:4px 8px; flex:1; margin-left:6px;" onclick="clearTrail()">🧹 Effacer Tracé</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">🤖 Contrôle Tête & Yeux</div>
+        <div class="slider-group">
+            <div class="slider-row">
+                <div class="slider-header">
+                    <span>Tête Pan (Yaw)</span>
+                    <span id="val-6" class="val">90°</span>
+                </div>
+                <input type="range" id="slider-6" min="30" max="150" value="90" oninput="onSliderMove(6, this.value)">
+            </div>
+            <div class="slider-row">
+                <div class="slider-header">
+                    <span>Tête Tilt (Pitch)</span>
+                    <span id="val-7" class="val">90°</span>
+                </div>
+                <input type="range" id="slider-7" min="50" max="140" value="90" oninput="onSliderMove(7, this.value)">
+            </div>
+            <div class="slider-row">
+                <div class="slider-header">
+                    <span>Paupière Gauche</span>
+                    <span id="val-8" class="val">20°</span>
+                </div>
+                <input type="range" id="slider-8" min="20" max="80" value="20" oninput="onSliderMove(8, this.value)">
+            </div>
+            <div class="slider-row">
+                <div class="slider-header">
+                    <span>Paupière Droite</span>
+                    <span id="val-9" class="val">20°</span>
+                </div>
+                <input type="range" id="slider-9" min="20" max="80" value="20" oninput="onSliderMove(9, this.value)">
+            </div>
+            <div class="pose-grid" style="margin-top:8px;">
+                <button class="btn" style="background:#303f9f;" onclick="triggerBlink()">😉 Cligner</button>
+                <button class="btn" style="background:#512da8;" onclick="triggerSleep()">😴 Dodo</button>
+            </div>
+        </div>
+
+        <div class="section-title">🎛️ Articulations Manuelles</div>
+        <div class="slider-group">
+            <div class="slider-row">
+                <div class="slider-header">
+                    <span>Base (Tourelle Z)</span>
+                    <span id="val-0" class="val">110°</span>
+                </div>
+                <input type="range" id="slider-0" min="50" max="160" value="110" oninput="onSliderMove(0, this.value)">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-header">
+                    <span>Épaule (Pitch Y)</span>
+                    <span id="val-1" class="val">90°</span>
+                </div>
+                <input type="range" id="slider-1" min="0" max="180" value="90" oninput="onSliderMove(1, this.value)">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-header">
+                    <span>Coude (Pitch Y)</span>
+                    <span id="val-2" class="val">90°</span>
+                </div>
+                <input type="range" id="slider-2" min="10" max="140" value="90" oninput="onSliderMove(2, this.value)">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-header">
+                    <span>Poignet (Pitch Y)</span>
+                    <span id="val-3" class="val">90°</span>
+                </div>
+                <input type="range" id="slider-3" min="20" max="180" value="90" oninput="onSliderMove(3, this.value)">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-header">
+                    <span>Rotation Poignet (Roll)</span>
+                    <span id="val-4" class="val">90°</span>
+                </div>
+                <input type="range" id="slider-4" min="0" max="180" value="90" oninput="onSliderMove(4, this.value)">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-header">
+                    <span>Pince</span>
+                    <span id="val-5" class="val">20°</span>
+                </div>
+                <input type="range" id="slider-5" min="20" max="85" value="20" oninput="onSliderMove(5, this.value)">
+            </div>
+        </div>
+
+        <div class="section-title">📐 Position Pince estimée (X, Y, Z)</div>
+        <div class="coords-box">
+            <div id="coord-x">X (Avant) : 0.0 cm</div>
+            <div id="coord-y">Y (Latéral) : 0.0 cm</div>
+            <div id="coord-z">Z (Hauteur) : 0.0 cm</div>
+        </div>
+    </div>
+
+    <script>
+        // Cotes réelles en cm (Milan 2 ROT3U)
+        const L_BASE = 8.0;      // 8 cm
+        const L_SHOULDER = 10.0; // 10 cm
+        const L_ELBOW = 10.0;    // 10 cm
+        const L_WRIST = 8.0;     // 8 cm
+
+        // Poses préconfigurées validées (Fixation Torse à 15 cm)
+        // Format: [Base, Épaule, Coude, Poignet, Roll, Pince, Pan, Tilt, OeilG, OeilD]
+        const POSES = {
+            park_compact:  [110, 15, 140, 130, 90, 85, 90, 90, 20, 20],
+            ground_grab:   [110, 135, 75, 129, 86, 20, 90, 110, 20, 20],
+            eye_level:     [110, 25, 70, 90, 90, 80, 90, 90, 20, 20],
+            forward_reach: [110, 85, 90, 90, 90, 30, 90, 90, 20, 20],
+            home:          [110, 45, 90, 90, 90, 20, 90, 90, 20, 20],
+            relax_down:    [110, 110, 70, 70, 90, 20, 90, 100, 80, 80]
+        };
+
+        // Angles de départ (position neutre prête)
+        let currentAngles = [110, 45, 90, 90, 90, 20, 90, 90, 20, 20];
+        let targetAngles = [...currentAngles];
+        let animating = false;
+        let animProgress = 1.0;
+        let animStartAngles = [...currentAngles];
+
+        // Configuration Three.js
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x131722);
+
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(40, 30, 45);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 12, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Éclairage
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(30, 50, 30);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        const fillLight = new THREE.DirectionalLight(0x4da3ff, 0.4);
+        fillLight.position.set(-20, 20, -20);
+        scene.add(fillLight);
+
+        // Sol et grille
+        const grid = new THREE.GridHelper(80, 40, 0x4da3ff, 0x22334d);
+        grid.position.y = 0;
+        scene.add(grid);
+
+        // Matériaux du robot
+        const matChassis = new THREE.MeshStandardMaterial({ color: 0x22262e, roughness: 0.5, metalness: 0.3 });
+        const matBucketBody = new THREE.MeshStandardMaterial({ color: 0x1e88e5, roughness: 0.4, transparent: true, opacity: 0.85 }); // Seau 5 gal bleu
+        const matBucketHead = new THREE.MeshStandardMaterial({ color: 0xf5f5f7, roughness: 0.3, transparent: true, opacity: 0.9 }); // Seau 1 gal blanc
+        const matJabra = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7, metalness: 0.4 });
+        const matCamera = new THREE.MeshStandardMaterial({ color: 0x000000, metalness: 0.8, roughness: 0.2 });
+        const matAluminumDark = new THREE.MeshStandardMaterial({ color: 0x3a424e, roughness: 0.3, metalness: 0.7 });
+        const matAluminumOrange = new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.3, metalness: 0.6 });
+        const matGripper = new THREE.MeshStandardMaterial({ color: 0x7f8c8d, roughness: 0.2, metalness: 0.8 });
+
+        // =============================================================
+        // RACINE PRINCIPALE DU ROBOT (Pour rouler sur la grille 3D)
+        // =============================================================
+        const robotRoot = new THREE.Group();
+        scene.add(robotRoot);
+
+        // 1. Châssis Aspirateur Robot (Cylindre noir rond au sol)
+        const vacuumChassis = new THREE.Mesh(
+            new THREE.CylinderGeometry(16, 16, 6, 48),
+            matChassis
+        );
+        vacuumChassis.position.y = 3;
+        robotRoot.add(vacuumChassis);
+
+        // Roues décoratives rotatives
+        const wheelGeom = new THREE.CylinderGeometry(3.5, 3.5, 2, 24);
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        const leftWheel = new THREE.Mesh(wheelGeom, wheelMat);
+        leftWheel.rotation.z = Math.PI / 2;
+        leftWheel.position.set(-14, 3.5, 0);
+        robotRoot.add(leftWheel);
+        const rightWheel = leftWheel.clone();
+        rightWheel.position.set(14, 3.5, 0);
+        robotRoot.add(rightWheel);
+
+        // 2. Corps : Seau de 5 gallons (Hauteur 36 cm, Diamètre ~28 cm)
+        const BODY_HEIGHT = 36.0;
+        const bodyMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(14, 12.5, BODY_HEIGHT, 36),
+            matBucketBody
+        );
+        bodyMesh.position.y = 6 + (BODY_HEIGHT / 2);
+        robotRoot.add(bodyMesh);
+
+        // 3. Tête : Seau de 1 gallon (Hauteur 18 cm, Diamètre 18 cm)
+        const headPanPivot = new THREE.Group();
+        headPanPivot.position.y = 6 + BODY_HEIGHT; // y = 42 cm
+        robotRoot.add(headPanPivot);
+
+        const headTiltPivot = new THREE.Group();
+        headTiltPivot.position.y = 9; // Centre de rotation vertical
+        headPanPivot.add(headTiltPivot);
+
+        const headMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(9, 8, 18, 32),
+            matBucketHead
+        );
+        headMesh.position.y = 0;
+        headTiltPivot.add(headMesh);
+
+        // Haut-parleur / micro Jabra (disque noir posé sur la tête)
+        const jabraMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(6, 6, 1.8, 32),
+            matJabra
+        );
+        jabraMesh.position.set(0, 9.5, 0);
+        headTiltPivot.add(jabraMesh);
+
+        // Webcam HD (fixée sur l'avant de la tête)
+        const webcamMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(7, 3, 3),
+            matCamera
+        );
+        webcamMesh.position.set(0, -2, 8.8);
+        headTiltPivot.add(webcamMesh);
+
+        const webcamLens = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.2, 1.2, 1, 16),
+            new THREE.MeshStandardMaterial({ color: 0x00bcd4, roughness: 0.1 })
+        );
+        webcamLens.rotation.x = Math.PI / 2;
+        webcamLens.position.set(0, -2, 10.5);
+        headTiltPivot.add(webcamLens);
+
+        // Yeux expressifs avec Paupières au dessus de la webcam
+        const eyeMat = new THREE.MeshStandardMaterial({color: 0xffffff});
+        const pupilMat = new THREE.MeshStandardMaterial({color: 0x111111});
+        const matEyelid = new THREE.MeshStandardMaterial({ color: 0xe67e22, side: THREE.DoubleSide });
+        const eyelidGeo = new THREE.SphereGeometry(1.5, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+
+        // Oeil Gauche
+        const eyeL = new THREE.Mesh(new THREE.SphereGeometry(1.4, 16, 16), eyeMat);
+        eyeL.position.set(-2.5, 2, 8.2);
+        headTiltPivot.add(eyeL);
+        const pupilL = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.2, 16), pupilMat);
+        pupilL.rotation.x = Math.PI / 2;
+        pupilL.position.set(0, 0, 1.3);
+        eyeL.add(pupilL);
+        const eyelidLeftMesh = new THREE.Mesh(eyelidGeo, matEyelid);
+        eyeL.add(eyelidLeftMesh);
+
+        // Oeil Droit
+        const eyeR = new THREE.Mesh(new THREE.SphereGeometry(1.4, 16, 16), eyeMat);
+        eyeR.position.set(2.5, 2, 8.2);
+        headTiltPivot.add(eyeR);
+        const pupilR = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.2, 16), pupilMat);
+        pupilR.rotation.x = Math.PI / 2;
+        pupilR.position.set(0, 0, 1.3);
+        eyeR.add(pupilR);
+        const eyelidRightMesh = new THREE.Mesh(eyelidGeo, matEyelid);
+        eyeR.add(eyelidRightMesh);
+
+        // -------------------------------------------------------------
+        // CONSTRUCTION DE LA CHAÎNE ARTICULÉE DU BRAS
+        // -------------------------------------------------------------
+        let currentMount = 'front';
+        let currentMountHeight = 15.0; // Hauteur définitive validée à 15 cm
+
+        const armMountBracket = new THREE.Group();
+        robotRoot.add(armMountBracket);
+
+        // Support / équerre de fixation mécanique fixée au seau
+        const mountShelf = new THREE.Mesh(new THREE.BoxGeometry(10, 1.2, 8), matAluminumDark);
+        mountShelf.position.set(0, -0.6, -2.5);
+        armMountBracket.add(mountShelf);
+
+        const armBaseGroup = new THREE.Group();
+        armMountBracket.add(armBaseGroup);
+
+        const basePillar = new THREE.Mesh(new THREE.CylinderGeometry(4, 5, L_BASE, 32), matAluminumDark);
+        basePillar.position.y = L_BASE / 2;
+        armBaseGroup.add(basePillar);
+
+        // Pivot Épaule (Joint 1 - Rotation Y)
+        const shoulderPivot = new THREE.Group();
+        shoulderPivot.position.y = L_BASE;
+        armBaseGroup.add(shoulderPivot);
+
+        const shoulderServoMesh = new THREE.Mesh(new THREE.BoxGeometry(4.5, 4.5, 5), matAluminumOrange);
+        shoulderPivot.add(shoulderServoMesh);
+
+        // Segment Épaule -> Coude (10 cm)
+        const shoulderArm = new THREE.Mesh(new THREE.BoxGeometry(2.5, L_SHOULDER, 2.5), matAluminumDark);
+        shoulderArm.position.y = L_SHOULDER / 2;
+        shoulderPivot.add(shoulderArm);
+
+        // Pivot Coude (Joint 2 - Rotation Y)
+        const elbowPivot = new THREE.Group();
+        elbowPivot.position.y = L_SHOULDER;
+        shoulderPivot.add(elbowPivot);
+
+        const elbowServoMesh = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 4), matAluminumOrange);
+        elbowPivot.add(elbowServoMesh);
+
+        // Segment Coude -> Poignet (10 cm)
+        const elbowArm = new THREE.Mesh(new THREE.BoxGeometry(2.2, L_ELBOW, 2.2), matAluminumDark);
+        elbowArm.position.y = L_ELBOW / 2;
+        elbowPivot.add(elbowArm);
+
+        // Pivot Poignet Pitch (Joint 3 - Rotation Y)
+        const wristPitchPivot = new THREE.Group();
+        wristPitchPivot.position.y = L_ELBOW;
+        elbowPivot.add(wristPitchPivot);
+
+        const wristPitchMesh = new THREE.Mesh(new THREE.BoxGeometry(3.5, 3.5, 3.5), matAluminumOrange);
+        wristPitchPivot.add(wristPitchMesh);
+
+        // Pivot Poignet Roll (Joint 4 - Rotation Roll / Axe du segment)
+        const wristRollPivot = new THREE.Group();
+        wristPitchPivot.add(wristRollPivot);
+
+        const wristArm = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, L_WRIST * 0.6, 16), matAluminumDark);
+        wristArm.position.y = (L_WRIST * 0.6) / 2;
+        wristRollPivot.add(wristArm);
+
+        // Base de la Pince
+        const gripperBase = new THREE.Group();
+        gripperBase.position.y = L_WRIST * 0.6;
+        wristRollPivot.add(gripperBase);
+
+        const gripperMount = new THREE.Mesh(new THREE.BoxGeometry(5, 1.5, 3), matAluminumDark);
+        gripperMount.position.y = 0.75;
+        gripperBase.add(gripperMount);
+
+        // Doigts de la Pince (Joint 5)
+        const leftFinger = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.5, 1.2), matGripper);
+        leftFinger.position.set(-1.5, 3.0, 0);
+        gripperBase.add(leftFinger);
+
+        const rightFinger = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.5, 1.2), matGripper);
+        rightFinger.position.set(1.5, 3.0, 0);
+        gripperBase.add(rightFinger);
+
+        // Marqueur visuel de l'extrémité de saisie
+        const tipMarker = new THREE.Mesh(
+            new THREE.SphereGeometry(0.6, 16, 16),
+            new THREE.MeshBasicMaterial({ color: 0x00ff88 })
+        );
+        tipMarker.position.set(0, 4.5, 0);
+        gripperBase.add(tipMarker);
+
+        // -------------------------------------------------------------
+        // APPLICATION DES ANGLES AUX JOINTS 3D (CORRIGÉE SANS INVERSION)
+        // -------------------------------------------------------------
+        function update3DModel(angles) {
+            const [degBase, degShoulder, degElbow, degWrist, degRoll, degGripper, degPan, degTilt, degEyeL, degEyeR] = angles;
+
+            // 0. Base : Tourelle Z (Rotation gauche / droite)
+            armBaseGroup.rotation.y = -THREE.MathUtils.degToRad(degBase - 110);
+
+            // 1. Épaule (Pitch X)
+            shoulderPivot.rotation.x = THREE.MathUtils.degToRad(degShoulder);
+
+            // 2. Coude (Pitch X)
+            elbowPivot.rotation.x = THREE.MathUtils.degToRad(degElbow - 90);
+
+            // 3. Poignet Pitch
+            wristPitchPivot.rotation.x = THREE.MathUtils.degToRad(degWrist - 90);
+
+            // 4. Poignet Roll
+            wristRollPivot.rotation.y = THREE.MathUtils.degToRad(degRoll - 90);
+
+            // 5. Pince (20=ouverte, 85=fermée)
+            const gripNorm = (degGripper - 20) / (85 - 20);
+            const fingerSpread = 1.8 - (gripNorm * 1.3);
+            leftFinger.position.x = -fingerSpread;
+            rightFinger.position.x = fingerSpread;
+
+            // 6-7. Tête Pan & Tilt
+            if(headPanPivot && headTiltPivot) {
+                headPanPivot.rotation.y = -THREE.MathUtils.degToRad((degPan || 90) - 90);
+                headTiltPivot.rotation.x = THREE.MathUtils.degToRad((degTilt || 90) - 90);
+            }
+
+            // 8-9. Paupières (20=ouverte, 80=fermée)
+            if(typeof eyelidLeftMesh !== 'undefined' && typeof eyelidRightMesh !== 'undefined') {
+                const eyeLNorm = ((degEyeL || 20) - 20) / 60;
+                const eyeRNorm = ((degEyeR || 20) - 20) / 60;
+                eyelidLeftMesh.rotation.x = (Math.PI / 2) + (eyeLNorm * (Math.PI / 1.8));
+                eyelidRightMesh.rotation.x = (Math.PI / 2) + (eyeRNorm * (Math.PI / 1.8));
+            }
+
+            // Coordonnées mondiales du bout de la pince
+            tipMarker.updateMatrixWorld();
+            const worldPos = new THREE.Vector3();
+            tipMarker.getWorldPosition(worldPos);
+
+            document.getElementById('coord-x').innerText = `X (Devant)  : ${worldPos.z.toFixed(1)} cm`;
+            document.getElementById('coord-y').innerText = `Y (Latéral) : ${(-worldPos.x).toFixed(1)} cm`;
+            document.getElementById('coord-z').innerText = `Z (Hauteur) : ${worldPos.y.toFixed(1)} cm`;
+
+            checkCollision();
+        }
+
+        function checkCollision() {
+            tipMarker.updateMatrixWorld();
+            const tipPos = new THREE.Vector3();
+            tipMarker.getWorldPosition(tipPos);
+
+            const badge = document.getElementById('safety-badge');
+            if (!badge) return false;
+
+            // 1. Protection Sol : Pince >= 0.8 cm (Y dans Three.js)
+            if (tipPos.y < 0.8) {
+                badge.style.background = '#4a1515';
+                badge.style.borderColor = '#d32f2f';
+                badge.style.color = '#ff8a80';
+                badge.innerHTML = `⚠️ <b>BUTÉE SOL :</b> Pince bloquée au ras du sol (${tipPos.y.toFixed(1)} cm) !`;
+                return true;
+            }
+
+            // 2. Protection Corps : Seau de 5 gal
+            const r = Math.sqrt(tipPos.x * tipPos.x + tipPos.z * tipPos.z);
+            if (tipPos.y >= 5.0 && tipPos.y <= 42.0 && r < 14.0) {
+                badge.style.background = '#4a2810';
+                badge.style.borderColor = '#f57c00';
+                badge.style.color = '#ffcc80';
+                badge.innerHTML = `⚠️ <b>BUTÉE CORPS :</b> Collision seau 5 gal évitée !`;
+                return true;
+            }
+
+            // 3. Protection Tête / Webcam
+            if (tipPos.y > 42.0 && tipPos.y <= 62.0 && r < 9.5) {
+                badge.style.background = '#4a2810';
+                badge.style.borderColor = '#f57c00';
+                badge.style.color = '#ffcc80';
+                badge.innerHTML = `⚠️ <b>BUTÉE TÊTE :</b> Collision webcam / tête évitée !`;
+                return true;
+            }
+
+            // Statut nominal
+            badge.style.background = '#14291c';
+            badge.style.borderColor = '#2e7d32';
+            badge.style.color = '#81c784';
+            badge.innerHTML = '🛡️ Protection Anti-Collision active (Sol & Corps protégés)';
+            return false;
+        }
+
+        function updateArmPlacement() {
+            // Monté définitivement sur support horizontal avant fixé au seau à 15 cm du sol
+            armMountBracket.position.set(0, 15.0, 14.5);
+            armMountBracket.rotation.set(0, 0, 0);
+        }
+
+        function onSliderMove(jointIndex, val) {
+            const prev = currentAngles[jointIndex];
+            targetAngles[jointIndex] = parseFloat(val);
+            currentAngles[jointIndex] = parseFloat(val);
+            update3DModel(currentAngles);
+
+            if (checkCollision()) {
+                // Revenir au dernier angle sûr si collision
+                targetAngles[jointIndex] = prev;
+                currentAngles[jointIndex] = prev;
+                document.getElementById(`slider-${jointIndex}`).value = Math.round(prev);
+                document.getElementById(`val-${jointIndex}`).innerText = `${Math.round(prev)}°`;
+                update3DModel(currentAngles);
+            } else {
+                document.getElementById(`val-${jointIndex}`).innerText = `${val}°`;
+            }
+        }
+
+        function setGripper(angle) {
+            const newAngles = [...currentAngles];
+            newAngles[5] = angle;
+            applyPoseAngles(newAngles);
+        }
+
+        function applyPose(name) {
+            if (POSES[name]) {
+                applyPoseAngles(POSES[name]);
+            }
+        }
+
+        function applyPoseAngles(angles) {
+            animStartAngles = [...currentAngles];
+            targetAngles = [...angles];
+            animProgress = 0.0;
+            animating = true;
+        }
+
+        function triggerBlink() {
+            // Fermer les yeux
+            targetAngles[8] = 80;
+            targetAngles[9] = 80;
+            update3DModel(targetAngles);
+            document.getElementById('slider-8').value = 80;
+            document.getElementById('slider-9').value = 80;
+            
+            // Rouvrir après un court instant
+            setTimeout(() => {
+                targetAngles[8] = 20;
+                targetAngles[9] = 20;
+                update3DModel(targetAngles);
+                document.getElementById('slider-8').value = 20;
+                document.getElementById('slider-9').value = 20;
+            }, 200);
+        }
+
+        function triggerSleep() {
+            // Fermer les yeux et baisser la tête
+            targetAngles[6] = 90;  // Pan neutre
+            targetAngles[7] = 110; // Tilt bas
+            targetAngles[8] = 80;  // Fermée
+            targetAngles[9] = 80;  // Fermée
+            applyPoseAngles(targetAngles);
+        }
+
+        // =============================================================
+        // PILOTAGE DIFFÉRENTIEL & CORRECTEUR ANTI-BANANE
+        // =============================================================
+        let robotX = 0.0;
+        let robotZ = 0.0;
+        let robotHeading = 0.0; // En radians (0 = orienté +Z)
+        let driveDir = null;    // 'forward', 'backward', 'left', 'right', or null
+        let autoCorrectHeading = true;
+        let lockedHeading = 0.0;
+        let isDrivingStraight = false;
+        const motorAsymmetry = 0.06; // Biais mécanique naturel de 6% (roue G plus rapide)
+
+        // Tracé de trajectoire au sol
+        const MAX_TRAIL = 400;
+        const trailPositions = new Float32Array(MAX_TRAIL * 3);
+        let trailCount = 0;
+        const trailGeom = new THREE.BufferGeometry();
+        trailGeom.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+        const trailMat = new THREE.LineBasicMaterial({ color: 0x00e5ff, linewidth: 3 });
+        const trailLine = new THREE.Line(trailGeom, trailMat);
+        scene.add(trailLine);
+
+        function addTrailPoint(x, z) {
+            if (trailCount < MAX_TRAIL) {
+                trailPositions[trailCount * 3] = x;
+                trailPositions[trailCount * 3 + 1] = 0.2; // 2mm au-dessus du sol
+                trailPositions[trailCount * 3 + 2] = z;
+                trailCount++;
+            } else {
+                for (let i = 0; i < (MAX_TRAIL - 1) * 3; i++) {
+                    trailPositions[i] = trailPositions[i + 3];
+                }
+                trailPositions[(MAX_TRAIL - 1) * 3] = x;
+                trailPositions[(MAX_TRAIL - 1) * 3 + 1] = 0.2;
+                trailPositions[(MAX_TRAIL - 1) * 3 + 2] = z;
+            }
+            trailGeom.setDrawRange(0, trailCount);
+            trailGeom.attributes.position.needsUpdate = true;
+        }
+
+        function clearTrail() {
+            trailCount = 0;
+            trailGeom.setDrawRange(0, 0);
+            trailGeom.attributes.position.needsUpdate = true;
+        }
+
+        function resetRobotPosition() {
+            robotX = 0.0;
+            robotZ = 0.0;
+            robotHeading = 0.0;
+            lockedHeading = 0.0;
+            isDrivingStraight = false;
+            robotRoot.position.set(0, 0, 0);
+            robotRoot.rotation.y = 0;
+            clearTrail();
+        }
+
+        function startDrive(cmd) {
+            driveDir = cmd;
+            if (cmd === 'forward' || cmd === 'backward') {
+                if (!isDrivingStraight) {
+                    lockedHeading = robotHeading;
+                    isDrivingStraight = true;
+                }
+            } else {
+                isDrivingStraight = false;
+            }
+        }
+
+        function stopDrive() {
+            driveDir = null;
+            isDrivingStraight = false;
+        }
+
+        function toggleHeadingHold() {
+            autoCorrectHeading = !autoCorrectHeading;
+            const btn = document.getElementById('btn-toggle-correct');
+            if (btn) {
+                if (autoCorrectHeading) {
+                    btn.style.background = '#2e7d32';
+                    btn.innerText = '🟢 ACTIF';
+                } else {
+                    btn.style.background = '#e65100';
+                    btn.innerText = '🔴 DÉSACTIVÉ';
+                }
+            }
+        }
+
+        // Support du clavier (Flèches et ZQSD)
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            if (e.key === 'ArrowUp' || e.key === 'z' || e.key === 'Z') startDrive('forward');
+            else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') startDrive('backward');
+            else if (e.key === 'ArrowLeft' || e.key === 'q' || e.key === 'Q') startDrive('left');
+            else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') startDrive('right');
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'z', 'q', 's', 'd', 'Z', 'Q', 'S', 'D'].includes(e.key)) {
+                stopDrive();
+            }
+        });
+
+        // Boucle d'animation fluide
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 1. Déplacement des roues et gestion de la trajectoire
+            if (driveDir) {
+                const speed = 0.35;
+                if (driveDir === 'forward') {
+                    if (!autoCorrectHeading) {
+                        // EFFET BANANE : La roue gauche tourne plus vite -> dérive en courbe vers la droite
+                        robotHeading -= motorAsymmetry * 0.05;
+                    } else {
+                        // CORRECTEUR ANTI-BANANE : Rétroaction sur le cap verrouillé
+                        const headingError = lockedHeading - robotHeading;
+                        robotHeading += headingError * 0.2;
+                    }
+                    robotX += Math.sin(robotHeading) * speed;
+                    robotZ += Math.cos(robotHeading) * speed;
+                    leftWheel.rotation.x += 0.15;
+                    rightWheel.rotation.x += 0.15;
+                    addTrailPoint(robotX, robotZ);
+                } else if (driveDir === 'backward') {
+                    if (!autoCorrectHeading) {
+                        robotHeading += motorAsymmetry * 0.05;
+                    } else {
+                        const headingError = lockedHeading - robotHeading;
+                        robotHeading += headingError * 0.2;
+                    }
+                    robotX -= Math.sin(robotHeading) * speed;
+                    robotZ -= Math.cos(robotHeading) * speed;
+                    leftWheel.rotation.x -= 0.15;
+                    rightWheel.rotation.x -= 0.15;
+                    addTrailPoint(robotX, robotZ);
+                } else if (driveDir === 'left') {
+                    robotHeading += 0.035;
+                    leftWheel.rotation.x -= 0.15;
+                    rightWheel.rotation.x += 0.15;
+                } else if (driveDir === 'right') {
+                    robotHeading -= 0.035;
+                    leftWheel.rotation.x += 0.15;
+                    rightWheel.rotation.x -= 0.15;
+                }
+
+                robotRoot.position.set(robotX, 0, robotZ);
+                robotRoot.rotation.y = robotHeading;
+            }
+
+            if (animating) {
+                animProgress += 0.035; // Vitesse de transition
+                if (animProgress >= 1.0) {
+                    animProgress = 1.0;
+                    animating = false;
+                }
+
+                // S-Curve Easing (accélération et décélération douces)
+                const ease = (1.0 - Math.cos(Math.PI * animProgress)) / 2.0;
+
+                for (let i = 0; i < 10; i++) {
+                    currentAngles[i] = animStartAngles[i] + (targetAngles[i] - animStartAngles[i]) * ease;
+                    const slider = document.getElementById(`slider-${i}`);
+                    const valText = document.getElementById(`val-${i}`);
+                    if(slider && valText) {
+                        slider.value = Math.round(currentAngles[i]);
+                        valText.innerText = `${Math.round(currentAngles[i])}°`;
+                    }
+                }
+
+                update3DModel(currentAngles);
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Redimensionnement de fenêtre
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // Polling optionnel pour se synchroniser avec Python (si servi via HTTP)
+        let lastSyncTime = 0;
+        setInterval(async () => {
+            if (window.location.protocol.startsWith('http')) {
+                try {
+                    const res = await fetch('arm_sim_state.json?t=' + Date.now());
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.timestamp && data.timestamp !== lastSyncTime) {
+                            lastSyncTime = data.timestamp;
+                            if (Array.isArray(data.angles)) {
+                                if (data.angles.length === 6) {
+                                    applyPoseAngles([...data.angles, 90, 90, 20, 20]);
+                                } else if (data.angles.length === 10) {
+                                    applyPoseAngles(data.angles);
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // Serveur local non actif ou fichier absent
+                }
+            }
+        }, 150);
+
+        // Initialisation
+        updateArmPlacement();
+        update3DModel(currentAngles);
+        animate();
+    </script>
+</body>
+</html>
