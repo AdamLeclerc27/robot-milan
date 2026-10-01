@@ -7,7 +7,7 @@ echo "========================================="
 # 1. Mise à jour et installation des paquets système
 echo "-> Installation des dépendances système..."
 sudo apt-get update
-sudo apt-get install -y python3-pip python3-venv git ffmpeg i2c-tools python3-pyaudio portaudio19-dev libasound2-dev alsa-utils libopencv-dev
+sudo apt-get install -y python3-pip python3-venv python3-dev git ffmpeg i2c-tools python3-pyaudio portaudio19-dev libasound2-dev alsa-utils libopencv-dev swig
 
 # 2. Création d'un environnement virtuel (Recommandé sur les nouveaux Raspberry Pi OS)
 echo "-> Configuration de l'environnement Python..."
