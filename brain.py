@@ -323,7 +323,7 @@ def main():
 
     while True:
         # --- Check Web Command ---
-        CMD_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "command.txt")
+        CMD_FILE = "/tmp/milan_command.txt"
         
         if not en_attente_reponse_directe:
             print("\n[En Veille] Écoute stricte de 'Hey Milan 2' ou 'Milan deux'...", flush=True)

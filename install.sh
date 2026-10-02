@@ -40,36 +40,17 @@ echo "-> Installation de la reconnaissance faciale (Compilation de dlib, cela pr
 sudo apt-get install -y build-essential cmake pkg-config libx11-dev libopenblas-dev libgtk-3-dev libboost-python-dev
 $VENV_DIR/bin/pip install dlib face_recognition
 
-# 4. Création des services Systemd pour lancer au démarrage
-echo "-> Création des services de démarrage..."
+# 4. Création du service Systemd pour lancer au démarrage
+echo "-> Création du service de démarrage..."
 APP_DIR=$(pwd)
 
-# Service 1 : L'application web et contrôleurs matériels (app.py)
-cat <<EOF | sudo tee /etc/systemd/system/milan-app.service
+cat <<EOF | sudo tee /etc/systemd/system/milan-robot.service
 [Unit]
-Description=Milan 2 - API et Controleurs (Flask)
-After=network.target
+Description=Robot Milan 2 - Service Unifie (Web + IA)
+After=network.target sound.target
 
 [Service]
-ExecStart=$VENV_DIR/bin/python $APP_DIR/app.py
-WorkingDirectory=$APP_DIR
-StandardOutput=inherit
-StandardError=inherit
-Restart=always
-User=milan
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Service 2 : Le cerveau IA et wakeword (wakeword.py)
-cat <<EOF | sudo tee /etc/systemd/system/milan-wakeword.service
-[Unit]
-Description=Milan 2 - Cerveau IA et Wakeword
-After=milan-app.service
-
-[Service]
-ExecStart=$VENV_DIR/bin/python $APP_DIR/wakeword.py
+ExecStart=$VENV_DIR/bin/python $APP_DIR/milan.py
 WorkingDirectory=$APP_DIR
 StandardOutput=inherit
 StandardError=inherit
@@ -81,14 +62,18 @@ Environment="PYTHONUNBUFFERED=1"
 WantedBy=multi-user.target
 EOF
 
-# 5. Activation des services
+# Nettoyage des vieux services obsolètes
+sudo systemctl stop milan-app.service 2>/dev/null || true
+sudo systemctl disable milan-app.service 2>/dev/null || true
+sudo systemctl stop milan-wakeword.service 2>/dev/null || true
+sudo systemctl disable milan-wakeword.service 2>/dev/null || true
+
+# 5. Activation du nouveau service
 sudo systemctl daemon-reload
-sudo systemctl enable milan-app.service
-sudo systemctl enable milan-wakeword.service
+sudo systemctl enable milan-robot.service
 
 echo "========================================="
 echo " Installation terminée ! "
 echo " Pour démarrer immédiatement :"
-echo " sudo systemctl start milan-app.service"
-echo " sudo systemctl start milan-wakeword.service"
+echo " sudo systemctl start milan-robot.service"
 echo "========================================="

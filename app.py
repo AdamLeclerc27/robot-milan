@@ -140,13 +140,20 @@ def home():
 def force_command():
     """Écrit une commande texte dans command.txt pour que brain.py la traite."""
     try:
-        data = request.get_json()
-        cmd = data.get('command', '')
-        cmd_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "command.txt")
+        if request.is_json:
+            data = request.get_json(silent=True) or {}
+        else:
+            data = request.form or request.values
+            
+        cmd = data.get('command', 'Que vois-tu ?')
+        
+        # On utilise /tmp/ qui est 100% accessible en écriture pour tous les services Linux
+        cmd_path = "/tmp/milan_command.txt"
         with open(cmd_path, "w", encoding="utf-8") as f:
             f.write(cmd)
         return jsonify({"status": "ok", "command": cmd})
     except Exception as e:
+        print(f"[Web API Error] {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/status')
