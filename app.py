@@ -120,7 +120,13 @@ HTML = """
     <script>
         function start(cmd) { fetch('/action/' + cmd); }
         function stop() { fetch('/action/stop'); }
-        function forceCommand(cmd) { fetch('/force_command/' + encodeURIComponent(cmd)); }
+        function forceCommand(cmd) { 
+            fetch('/force_command', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({command: cmd})
+            }); 
+        }
     </script>
 </body>
 </html>
@@ -130,11 +136,14 @@ HTML = """
 def home():
     return render_template_string(HTML)
 
-@app.route('/force_command/<cmd>')
-def force_command(cmd):
+@app.route('/force_command', methods=['POST'])
+def force_command():
     """Écrit une commande texte dans command.txt pour que brain.py la traite."""
     try:
-        with open("command.txt", "w", encoding="utf-8") as f:
+        data = request.get_json()
+        cmd = data.get('command', '')
+        cmd_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "command.txt")
+        with open(cmd_path, "w", encoding="utf-8") as f:
             f.write(cmd)
         return jsonify({"status": "ok", "command": cmd})
     except Exception as e:

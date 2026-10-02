@@ -322,6 +322,9 @@ def main():
     en_attente_reponse_directe = False
 
     while True:
+        # --- Check Web Command ---
+        CMD_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "command.txt")
+        
         if not en_attente_reponse_directe:
             print("\n[En Veille] Écoute stricte de 'Hey Milan 2' ou 'Milan deux'...", flush=True)
             if model:
@@ -339,7 +342,7 @@ def main():
                 try:
                     while not wakeword_detected:
                         # --- Check Web Command ---
-                        if os.path.exists("command.txt"):
+                        if os.path.exists(CMD_FILE):
                             wakeword_detected = True
                             break
                         # -------------------------
@@ -368,11 +371,11 @@ def main():
 
         # --- Lecture de la commande ---
         full_text = ""
-        if os.path.exists("command.txt"):
+        if os.path.exists(CMD_FILE):
             try:
-                with open("command.txt", "r", encoding="utf-8") as f:
+                with open(CMD_FILE, "r", encoding="utf-8") as f:
                     full_text = f.read().strip()
-                os.remove("command.txt")
+                os.remove(CMD_FILE)
                 print(f"[Web UI] Commande reçue : {full_text}", flush=True)
             except Exception:
                 pass
