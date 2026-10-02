@@ -16,17 +16,20 @@ from vosk import Model, KaldiRecognizer
 import speech_recognition as sr
 import numpy as np
 import cv2
+from dotenv import load_dotenv
 
 from robot_face import FaceMemory
 
-# Configuration Ollama Local
-OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
-OLLAMA_MODEL = "llama3.2-vision" 
+# Charge les variables depuis le fichier .env
+load_dotenv()
+
+# Configuration depuis .env (avec valeurs par défaut)
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://192.168.1.125:11434/api/chat")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2-vision")
+FLASK_URL = os.getenv("FLASK_URL", "http://127.0.0.1:5000/action/")
+MODEL_PATH = os.getenv("WAKEWORD_MODEL_PATH", "/home/milan/model_fr")
 
 os.environ['PYAUDIO_HIDE_ALSA_LOGS'] = '1'
-MODEL_PATH = "/home/milan/model_fr"
-FLASK_URL = "http://127.0.0.1:5000/action/"
-SPEED_MPS = 0.5
 MEMORY_FILE = "milan_memory.json"
 
 ai_lock = threading.Lock()
@@ -55,17 +58,20 @@ chat_history = load_memory()
 def get_jabra_devices(p):
     input_idx = None
     output_idx = None
+    print("[Audio] Scan des périphériques...", flush=True)
     for i in range(p.get_device_count()):
         try:
             dev_info = p.get_device_info_by_index(i)
             dev_name = dev_info.get('name', '').lower()
-            if 'jabra' in dev_name or 'speak' in dev_name:
+            print(f" - Dispositif {i} : {dev_name} (in:{dev_info.get('maxInputChannels')}, out:{dev_info.get('maxOutputChannels')})", flush=True)
+            if 'jabra' in dev_name or 'speak' in dev_name or 'usb' in dev_name:
                 if dev_info.get('maxInputChannels', 0) > 0 and input_idx is None:
                     input_idx = i
                 if dev_info.get('maxOutputChannels', 0) > 0 and output_idx is None:
                     output_idx = i
         except Exception:
             pass
+    print(f"[Audio] Sélection -> Input: {input_idx}, Output: {output_idx}", flush=True)
     return input_idx, output_idx
 
 def play_beep_async(p, output_idx):
@@ -145,10 +151,7 @@ def execute_sequence(actions, img_cv2=None):
             name = step.get('name', 'Inconnu')
             if img_cv2 is not None:
                 success = face_mem.learn_face(name, img_cv2)
-                if success:
-                    # Ne pas faire de TTS ici car l'IA va probablement déjà dire un truc ("Enchanté Milan")
-                    pass
-                else:
+                if not success:
                     print("[EXECUTION] Impossible de voir le visage.")
         else:
             send_action(action)
@@ -160,21 +163,19 @@ def execute_sequence(actions, img_cv2=None):
                 time.sleep(1.0)
     print("[EXECUTION] Plan terminé.", flush=True)
 
-def ask_ollama_vision(user_query):
-    """Envoie la commande à Ollama et retourne si une réponse de l'utilisateur est attendue."""
+def ask_laptop_brain(user_query):
+    """Envoie la photo et le texte à Ollama sur ton Laptop."""
     global chat_history
     attend_reponse_suivante = False
     
     with ai_lock:
-        print(f"[IA] Analyse de la commande : '{user_query}'", flush=True)
-        play_tts("Laisse moi regarder.")
+        print(f"[IA] Connexion au Laptop ({OLLAMA_URL}) pour analyser '{user_query}'...", flush=True)
         
         b64_image = get_camera_snapshot_base64()
         img_cv2 = None
         context_personnes = ""
         
         if b64_image:
-            # Reconversion pour analyser les visages localement
             img_data = base64.b64decode(b64_image)
             np_arr = np.frombuffer(img_data, np.uint8)
             img_cv2 = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
@@ -206,16 +207,20 @@ def ask_ollama_vision(user_query):
         if b64_image:
             user_message["images"] = [b64_image]
 
-        messages = [{"role": "system", "content": system_prompt}] + chat_history + [user_message]
+        # On limite à l'historique récent pour ne pas perdre le contexte
+        messages = [{"role": "system", "content": system_prompt}] + chat_history[-6:] + [user_message]
 
         try:
             payload = {
                 "model": OLLAMA_MODEL,
                 "messages": messages,
                 "stream": False,
-                "format": "json"
+                "format": "json", # Ton PC est assez puissant pour valider le JSON !
+                "options": {
+                    "temperature": 0.4
+                }
             }
-            res = requests.post(OLLAMA_URL, json=payload, timeout=45)
+            res = requests.post(OLLAMA_URL, json=payload, timeout=60)
             res.raise_for_status()
             response_text = res.json().get("message", {}).get("content", "{}")
             
@@ -225,9 +230,12 @@ def ask_ollama_vision(user_query):
                 clean_json = response_text.replace("```json", "").replace("```", "").strip()
                 parsed = json.loads(clean_json)
 
-            chat_history.append({"role": "user", "content": user_query})
-            chat_history.append({"role": "assistant", "content": response_text})
+            # --- Mise à jour de la mémoire ---
+            clean_user_message = {"role": "user", "content": user_query}
+            chat_history.append(clean_user_message)
+            chat_history.append({"role": "assistant", "content": json.dumps(parsed, ensure_ascii=False)})
             save_memory(chat_history)
+            # ---------------------------------
 
             tts_text = parsed.get("reponse_vocale", "")
             attend_reponse_suivante = parsed.get("attend_reponse", False)
@@ -242,7 +250,7 @@ def ask_ollama_vision(user_query):
             
         except Exception as e:
             print(f"[IA Erreur] {e}")
-            play_tts("Désolé, je n'arrive pas à réfléchir avec mon cerveau local.")
+            play_tts("Oups, je n'arrive pas à joindre mon cerveau externe.")
             
     return attend_reponse_suivante
 
@@ -304,7 +312,11 @@ def main():
     
     words_grammar = '["hey", "milan", "deux", "2", "[unk]"]'
     p = pyaudio.PyAudio()
+    print("\n--- INITIALISATION AUDIO ---", flush=True)
     in_idx, out_idx = get_jabra_devices(p)
+    if in_idx is None:
+        print("[Avertissement] Aucun micro USB/Jabra détecté ! Utilisation du micro par défaut (None).", flush=True)
+    print("----------------------------\n", flush=True)
     sr_recognizer = sr.Recognizer()
 
     en_attente_reponse_directe = False
@@ -315,8 +327,10 @@ def main():
             if model:
                 recognizer = KaldiRecognizer(model, 16000, words_grammar)
                 try:
+                    print(f"[Audio] Ouverture du flux d'écoute sur le micro {in_idx}...", flush=True)
                     stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True,
                                     input_device_index=in_idx, frames_per_buffer=4000)
+                    print("[Audio] Flux ouvert avec succès, en attente de la voix.", flush=True)
                 except Exception as e:
                     print(f"[Audio Error] {e}")
                     break
@@ -324,11 +338,19 @@ def main():
                 wakeword_detected = False
                 try:
                     while not wakeword_detected:
+                        # --- Check Web Command ---
+                        if os.path.exists("command.txt"):
+                            wakeword_detected = True
+                            break
+                        # -------------------------
                         data = stream.read(4000, exception_on_overflow=False)
-                        if len(data) == 0: continue
+                        if len(data) == 0:
+                            continue
                         if recognizer.AcceptWaveform(data):
                             res = json.loads(recognizer.Result())
                             text = res.get("text", "").lower()
+                            if text != "":
+                                print(f"[Vosk a entendu] : '{text}'", flush=True)
                             if "hey milan deux" in text or "hey milan 2" in text or "milan deux" in text or "milan 2" in text:
                                 wakeword_detected = True
                 finally:
@@ -344,13 +366,33 @@ def main():
             print("\n[Conversation Continue] Milan 2 écoute votre réponse...", flush=True)
             # Pas de bip ici pour que ce soit plus naturel comme dans une vraie discussion
 
-        wav_file = record_until_silence(p, in_idx)
-        full_text = transcribe_cloud_stt(sr_recognizer, wav_file)
+        # --- Lecture de la commande ---
+        full_text = ""
+        if os.path.exists("command.txt"):
+            try:
+                with open("command.txt", "r", encoding="utf-8") as f:
+                    full_text = f.read().strip()
+                os.remove("command.txt")
+                print(f"[Web UI] Commande reçue : {full_text}", flush=True)
+            except Exception:
+                pass
+
+        # Si aucune commande web, on écoute le micro
+        if not full_text:
+            wav_file = record_until_silence(p, in_idx)
+            full_text = transcribe_cloud_stt(sr_recognizer, wav_file)
+            if os.path.exists(wav_file):
+                try:
+                    os.remove(wav_file)
+                except:
+                    pass
+        # ------------------------------
         
         print(f"[Commande] : \"{full_text}\"", flush=True)
 
         if full_text:
-            en_attente_reponse_directe = ask_ollama_vision(full_text)
+            # On envoie TOUT au laptop
+            en_attente_reponse_directe = ask_laptop_brain(full_text)
         else:
             if en_attente_reponse_directe:
                 print("[Conversation] Fin de la discussion (silence).")

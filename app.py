@@ -116,9 +116,11 @@ HTML = """
         <button class="btn" onpointerdown="start('right')" onpointerup="stop()" onpointerleave="stop()">►</button>
         <div></div><button class="btn" onpointerdown="start('backward')" onpointerup="stop()" onpointerleave="stop()">▼</button><div></div>
     </div>
+    <button class="btn" style="background-color: #e91e63; color: white; width: 100%; max-width: 280px; margin-top: 15px; font-size: 16px;" onclick="forceCommand('Que vois-tu ?')">👁️ Que vois-tu ?</button>
     <script>
         function start(cmd) { fetch('/action/' + cmd); }
         function stop() { fetch('/action/stop'); }
+        function forceCommand(cmd) { fetch('/force_command/' + encodeURIComponent(cmd)); }
     </script>
 </body>
 </html>
@@ -127,6 +129,16 @@ HTML = """
 @app.route('/')
 def home():
     return render_template_string(HTML)
+
+@app.route('/force_command/<cmd>')
+def force_command(cmd):
+    """Écrit une commande texte dans command.txt pour que brain.py la traite."""
+    try:
+        with open("command.txt", "w", encoding="utf-8") as f:
+            f.write(cmd)
+        return jsonify({"status": "ok", "command": cmd})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/status')
 def status():
