@@ -153,7 +153,11 @@
             color: #9ab;
             pointer-events: none;
         }
-    </style>
+            #logs-container { background: #000; border: 1px solid #4da3ff; border-radius: 8px; height: 120px; overflow-y: auto; padding: 8px; font-family: monospace; font-size: 0.8rem; color: #00ff00; margin-bottom: 10px; }
+        .log-entry { margin-bottom: 4px; border-bottom: 1px dotted #333; padding-bottom: 2px; }
+        .log-robot { color: #ff9800; }
+@media (max-width: 768px) { body { height: auto; overflow: auto; display: block; } #canvas-container { display: none !important; } #panel { width: 100% !important; min-height: 100vh; border-left: none; } }
+</style>
     <!-- Three.js + OrbitControls depuis un CDN fiable -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -168,6 +172,25 @@
 
     <div id="panel">
         <h1>🦾 Milan 2 - Corps & Bras</h1>
+        <!-- SECTION VIDEO & IA -->
+        <div class="section-title">👁️ Vision & Intelligence</div>
+        <div style="width: 100%; flex-shrink: 0; border-radius: 8px; overflow: hidden; background-color: #000; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
+            <img id="video-stream" src="/video_feed?v={{ range(1, 100000) | random }}" alt="Webcam Video" style="width: 100%; height: auto; aspect-ratio: 4/3; display: block; object-fit: cover; background-color: #111;" onerror="console.log('Video error'); setTimeout(() => { this.src='/video_feed?v=' + new Date().getTime(); }, 2000);">
+        </div>
+        <button class="btn" style="background-color: #e91e63; font-size: 14px; border:none; margin-top:5px; margin-bottom: 5px;" onclick="forceCommand('Que vois-tu ?')">📸 Que vois-tu ?</button>
+        
+        <div style="display: flex; gap: 8px; margin-top: 5px; margin-bottom: 10px;">
+            <input type="text" id="textCmd" placeholder="Parler au robot..." style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #2a3a54; background: #0f141f; color: white; font-size: 14px;" onkeypress="if(event.key === 'Enter') sendTextCmd()">
+            <button class="btn" style="background-color: #2196F3; width: auto; border: none; padding: 0 15px;" onclick="sendTextCmd()">Envoyer</button>
+        </div>
+
+        <div id="reply-box" style="background:#0b1020; border: 1px solid #4da3ff; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; flex-shrink: 0; font-size: 0.9rem; color: #ffd27f; line-height: 1.35;">
+            <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#8fa3bf; margin-bottom:4px;">
+                <span>🔊 Milan dit :</span>
+                <span id="reply-meta">—</span>
+            </div>
+            <div id="reply-text" style="white-space: pre-wrap; word-wrap: break-word; min-height: 2.7em;">En attente d'une réponse...</div>
+        </div>
 
         <div style="background:#19202e; border: 1px solid #2a3a54; border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
             <span>📍 <b>Configuration :</b> Torse avant</span>
@@ -231,28 +254,28 @@
                     <span>Tête Pan (Yaw)</span>
                     <span id="val-6" class="val">90°</span>
                 </div>
-                <input type="range" id="slider-6" min="30" max="150" value="90" oninput="onSliderMove(6, this.value)">
+                <input type="range" id="slider-6" min="0" max="180" value="90" oninput="onSliderMove(6, this.value)">
             </div>
             <div class="slider-row">
                 <div class="slider-header">
                     <span>Tête Tilt (Pitch)</span>
-                    <span id="val-7" class="val">90°</span>
+                    <span id="val-7" class="val">88°</span>
                 </div>
-                <input type="range" id="slider-7" min="50" max="140" value="90" oninput="onSliderMove(7, this.value)">
+                <input type="range" id="slider-7" min="30" max="180" value="88" oninput="onSliderMove(7, this.value)">
             </div>
             <div class="slider-row">
                 <div class="slider-header">
                     <span>Paupière Gauche</span>
                     <span id="val-8" class="val">20°</span>
                 </div>
-                <input type="range" id="slider-8" min="20" max="80" value="20" oninput="onSliderMove(8, this.value)">
+                <input type="range" id="slider-8" min="0" max="90" value="90" oninput="onSliderMove(8, this.value)">
             </div>
             <div class="slider-row">
                 <div class="slider-header">
                     <span>Paupière Droite</span>
                     <span id="val-9" class="val">20°</span>
                 </div>
-                <input type="range" id="slider-9" min="20" max="80" value="20" oninput="onSliderMove(9, this.value)">
+                <input type="range" id="slider-9" min="90" max="180" value="90" oninput="onSliderMove(9, this.value)">
             </div>
             <div class="pose-grid" style="margin-top:8px;">
                 <button class="btn" style="background:#303f9f;" onclick="triggerBlink()">😉 Cligner</button>
@@ -265,33 +288,33 @@
             <div class="slider-row">
                 <div class="slider-header">
                     <span>Base (Tourelle Z)</span>
-                    <span id="val-0" class="val">110°</span>
+                    <span id="val-0" class="val">123°</span>
                 </div>
-                <input type="range" id="slider-0" min="50" max="160" value="110" oninput="onSliderMove(0, this.value)">
+                <input type="range" id="slider-0" min="0" max="180" value="123" oninput="onSliderMove(0, this.value)">
             </div>
 
             <div class="slider-row">
                 <div class="slider-header">
                     <span>Épaule (Pitch Y)</span>
-                    <span id="val-1" class="val">90°</span>
+                    <span id="val-1" class="val">20°</span>
                 </div>
-                <input type="range" id="slider-1" min="0" max="180" value="90" oninput="onSliderMove(1, this.value)">
+                <input type="range" id="slider-1" min="0" max="110" value="20" oninput="onSliderMove(1, this.value)">
             </div>
 
             <div class="slider-row">
                 <div class="slider-header">
                     <span>Coude (Pitch Y)</span>
-                    <span id="val-2" class="val">90°</span>
+                    <span id="val-2" class="val">115°</span>
                 </div>
-                <input type="range" id="slider-2" min="10" max="140" value="90" oninput="onSliderMove(2, this.value)">
+                <input type="range" id="slider-2" min="0" max="150" value="115" oninput="onSliderMove(2, this.value)">
             </div>
 
             <div class="slider-row">
                 <div class="slider-header">
                     <span>Poignet (Pitch Y)</span>
-                    <span id="val-3" class="val">90°</span>
+                    <span id="val-3" class="val">117°</span>
                 </div>
-                <input type="range" id="slider-3" min="20" max="180" value="90" oninput="onSliderMove(3, this.value)">
+                <input type="range" id="slider-3" min="20" max="180" value="117" oninput="onSliderMove(3, this.value)">
             </div>
 
             <div class="slider-row">
@@ -305,9 +328,9 @@
             <div class="slider-row">
                 <div class="slider-header">
                     <span>Pince</span>
-                    <span id="val-5" class="val">20°</span>
+                    <span id="val-5" class="val">15°</span>
                 </div>
-                <input type="range" id="slider-5" min="20" max="85" value="20" oninput="onSliderMove(5, this.value)">
+                <input type="range" id="slider-5" min="0" max="90" value="15" oninput="onSliderMove(5, this.value)">
             </div>
         </div>
 
@@ -319,26 +342,109 @@
         </div>
     </div>
 
-    <script>
+    
+
+<script>
+
+        function addLog(msg, isRobot=false) {
+            const container = document.getElementById('logs-container');
+            if(!container) return;
+            const d = new Date();
+            const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0') + ':' + d.getSeconds().toString().padStart(2, '0');
+            const div = document.createElement('div');
+            div.className = 'log-entry' + (isRobot ? ' log-robot' : '');
+            div.innerHTML = '[' + timeStr + '] ' + msg;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function startDrive(cmd) { fetch('/action/' + cmd); addLog('Moteur: ' + cmd.toUpperCase()); }
+        function stopDrive() { fetch('/action/stop'); }
+        function applyPoseCmd(cmd) { fetch('/action/' + cmd); addLog('Bras: Move To ' + cmd.toUpperCase()); }
+        function triggerBlinkCmd() { fetch('/action/blink'); addLog("Tête: Clin d'oeil"); }
+        function triggerSleepCmd() { fetch('/action/park'); addLog('Système: Dodo (Park)'); }
+        function setGripperCmd(val) {
+            if(val < 50) { fetch('/action/open_gripper'); addLog('Pince: Ouverte'); }
+            else { fetch('/action/close_gripper'); addLog('Pince: Fermée'); }
+        }
+
+        function forceCommand(cmd) { 
+            addLog('Vous: ' + cmd);
+            setReplyText('⏳ Milan réfléchit...', 'en cours');
+            fetch('/force_command', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({command: cmd})
+            }).then(res => res.json()).then(data => {
+                if(data && data.response) {
+                    addLog('Milan: ' + data.response, true);
+                    setReplyText(data.response, data.source || 'web');
+                } else if (data && data.timeout) {
+                    setReplyText('Pas de réponse vocale (délai dépassé).', 'timeout');
+                }
+            }).catch(err => { addLog('Commande envoyée au robot.', true); });
+        }
+
+        // Fenêtre de réponse : affiche ce que Milan a dit à voix haute
+        let lastReplySeq = -1;
+        function setReplyText(text, source) {
+            const t = document.getElementById('reply-text');
+            const m = document.getElementById('reply-meta');
+            if (!t || !m) return;
+            t.textContent = text || '—';
+            m.textContent = source ? ('source : ' + source) : '';
+        }
+        function pollLastReply() {
+            fetch('/last_reply?t=' + Date.now()).then(r => r.json()).then(d => {
+                // Ne met à jour que si une nouvelle réponse a été produite (ex. via le micro)
+                if (d && d.seq !== undefined && d.seq !== lastReplySeq) {
+                    if (lastReplySeq !== -1 && d.text) {
+                        addLog('Milan: ' + d.text, true);
+                    }
+                    lastReplySeq = d.seq;
+                    if (d.text) setReplyText(d.text, d.source);
+                }
+            }).catch(() => {});
+        }
+        setInterval(pollLastReply, 1500);
+        pollLastReply();
+
+        function sendTextCmd() {
+            var input = document.getElementById('textCmd');
+            var val = input.value.trim();
+            if (val) {
+                forceCommand(val);
+                input.value = '';
+            }
+        }
         // Cotes réelles en cm (Milan 2 ROT3U)
         const L_BASE = 8.0;      // 8 cm
         const L_SHOULDER = 10.0; // 10 cm
         const L_ELBOW = 10.0;    // 10 cm
         const L_WRIST = 8.0;     // 8 cm
+        // --- Calibration mesuree sur le robot reel (pose de prise validee [123,19,61,47,90,3]) ---
+        // L'axe de l'epaule est a 15 cm du sol (et non la base du support). Pince prete a saisir : X=25 cm, Y=0, Z=0.
+        const SHOULDER_PIVOT_HEIGHT = 15.0; // cm : hauteur reelle de l'axe d'epaule
+        const MOUNT_FORWARD_CM = 13.04;     // cm : avance du bras / axe du robot (ajustee sur X=25)
+        const TIP_OFFSET_CM = 4.88;         // cm : point de saisie au-dela de la base de pince (ajuste sur Z=0)
+        const GROUND_TOL_CM = -0.5;         // cm : tolerance sous le sol avant butee (la pince peut toucher Z=0)
 
         // Poses préconfigurées validées (Fixation Torse à 15 cm)
         // Format: [Base, Épaule, Coude, Poignet, Roll, Pince, Pan, Tilt, OeilG, OeilD]
         const POSES = {
-            park_compact:  [110, 15, 140, 130, 90, 85, 90, 90, 20, 20],
-            ground_grab:   [110, 135, 75, 129, 86, 20, 90, 110, 20, 20],
-            eye_level:     [110, 25, 70, 90, 90, 80, 90, 90, 20, 20],
-            forward_reach: [110, 85, 90, 90, 90, 30, 90, 90, 20, 20],
-            home:          [110, 45, 90, 90, 90, 20, 90, 90, 20, 20],
-            relax_down:    [110, 110, 70, 70, 90, 20, 90, 100, 80, 80]
-        };
+    park:          [180, 110, 150, 40, 152, 88, 70, 70, 0, 180],
+    park_compact:  [180, 110, 150, 40, 152, 88, 70, 70, 0, 180],
+    ground_grab:   [122, 33, 96, 52, 90, 0, 70, 70, 0, 180],
+    eye_level:     [122, 80, 70, 90, 90, 80, 70, 100, 0, 180],
+    observe:       [122, 80, 70, 90, 90, 15, 70, 100, 0, 180],
+    forward_reach: [122, 50, 115, 117, 90, 30, 70, 100, 0, 180],
+    home:          [122, 20, 115, 117, 90, 15, 70, 100, 0, 180],
+    relax_down:    [122, 110, 70, 70, 90, 20, 70, 70, 90, 90],
+    carry:         [122, 40, 110, 110, 90, 80, 70, 100, 0, 180]
+};
 
         // Angles de départ (position neutre prête)
-        let currentAngles = [110, 45, 90, 90, 90, 20, 90, 90, 20, 20];
+        let currentAngles = [122, 20, 115, 117, 90, 15, 70, 100, 0, 180];
         let targetAngles = [...currentAngles];
         let animating = false;
         let animProgress = 1.0;
@@ -350,7 +456,7 @@
         scene.background = new THREE.Color(0x131722);
 
         const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-        camera.position.set(40, 30, 45);
+        camera.position.set(130, 80, 150);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
@@ -381,13 +487,13 @@
         scene.add(grid);
 
         // Matériaux du robot
-        const matChassis = new THREE.MeshStandardMaterial({ color: 0x22262e, roughness: 0.5, metalness: 0.3 });
-        const matBucketBody = new THREE.MeshStandardMaterial({ color: 0x1e88e5, roughness: 0.4, transparent: true, opacity: 0.85 }); // Seau 5 gal bleu
-        const matBucketHead = new THREE.MeshStandardMaterial({ color: 0xf5f5f7, roughness: 0.3, transparent: true, opacity: 0.9 }); // Seau 1 gal blanc
+        const matChassis = new THREE.MeshStandardMaterial({ color: 0x1e88e5, roughness: 0.8, metalness: 0.1 }); // Base bleue
+        const matBucketBody = new THREE.MeshStandardMaterial({ color: 0xf5f5f7, roughness: 0.6, metalness: 0.1 }); // Corps blanc solide // Seau 5 gal bleu
+        const matBucketHead = new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.6, metalness: 0.1 }); // Tête blanche solide // Seau 1 gal blanc
         const matJabra = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7, metalness: 0.4 });
         const matCamera = new THREE.MeshStandardMaterial({ color: 0x000000, metalness: 0.8, roughness: 0.2 });
-        const matAluminumDark = new THREE.MeshStandardMaterial({ color: 0x3a424e, roughness: 0.3, metalness: 0.7 });
-        const matAluminumOrange = new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.3, metalness: 0.6 });
+        const matAluminumDark = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.7, metalness: 0.2 }); // Servos noirs
+        const matAluminumOrange = new THREE.MeshStandardMaterial({ color: 0xd0d4d9, roughness: 0.4, metalness: 0.8 }); // Métal gris
         const matGripper = new THREE.MeshStandardMaterial({ color: 0x7f8c8d, roughness: 0.2, metalness: 0.8 });
 
         // =============================================================
@@ -467,7 +573,7 @@
         // Yeux expressifs avec Paupières au dessus de la webcam
         const eyeMat = new THREE.MeshStandardMaterial({color: 0xffffff});
         const pupilMat = new THREE.MeshStandardMaterial({color: 0x111111});
-        const matEyelid = new THREE.MeshStandardMaterial({ color: 0xe67e22, side: THREE.DoubleSide });
+        const matEyelid = new THREE.MeshStandardMaterial({ color: 0xcfa876, roughness: 0.9, side: THREE.DoubleSide }); // Carton brun
         const eyelidGeo = new THREE.SphereGeometry(1.5, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
 
         // Oeil Gauche
@@ -578,7 +684,7 @@
             new THREE.SphereGeometry(0.6, 16, 16),
             new THREE.MeshBasicMaterial({ color: 0x00ff88 })
         );
-        tipMarker.position.set(0, 4.5, 0);
+        tipMarker.position.set(0, TIP_OFFSET_CM, 0);
         gripperBase.add(tipMarker);
 
         // -------------------------------------------------------------
@@ -587,37 +693,37 @@
         function update3DModel(angles) {
             const [degBase, degShoulder, degElbow, degWrist, degRoll, degGripper, degPan, degTilt, degEyeL, degEyeR] = angles;
 
-            // 0. Base : Tourelle Z (Rotation gauche / droite)
-            armBaseGroup.rotation.y = -THREE.MathUtils.degToRad(degBase - 110);
+            // 0. Base : 123 = Devant (0 rad 3D)
+            armBaseGroup.rotation.y = THREE.MathUtils.degToRad(degBase - 123);
 
-            // 1. Épaule (Pitch X)
-            shoulderPivot.rotation.x = THREE.MathUtils.degToRad(degShoulder);
+            // 1. Épaule (Pitch X) : 110 = Haut (0 rad 3D)
+            shoulderPivot.rotation.x = THREE.MathUtils.degToRad(105 - degShoulder);
 
-            // 2. Coude (Pitch X)
-            elbowPivot.rotation.x = THREE.MathUtils.degToRad(degElbow - 90);
+            // 2. Coude (Pitch X) : 115 = 90° relatif
+            elbowPivot.rotation.x = THREE.MathUtils.degToRad(degElbow - 10);
 
-            // 3. Poignet Pitch
-            wristPitchPivot.rotation.x = THREE.MathUtils.degToRad(degWrist - 90);
+            // 3. Poignet Pitch : 117 = 90° relatif
+            wristPitchPivot.rotation.x = THREE.MathUtils.degToRad(120 - degWrist);
 
-            // 4. Poignet Roll
-            wristRollPivot.rotation.y = THREE.MathUtils.degToRad(degRoll - 90);
+            // 4. Poignet Roll : 90 = neutre
+            wristRollPivot.rotation.y = THREE.MathUtils.degToRad(90 - degRoll);
 
-            // 5. Pince (20=ouverte, 85=fermée)
-            const gripNorm = (degGripper - 20) / (85 - 20);
+            // 5. Pince (15=ouverte, 85=fermée)
+            const gripNorm = Math.max(0, Math.min(1, (degGripper - 0) / (85 - 0)));
             const fingerSpread = 1.8 - (gripNorm * 1.3);
             leftFinger.position.x = -fingerSpread;
             rightFinger.position.x = fingerSpread;
 
             // 6-7. Tête Pan & Tilt
             if(headPanPivot && headTiltPivot) {
-                headPanPivot.rotation.y = -THREE.MathUtils.degToRad((degPan || 90) - 90);
-                headTiltPivot.rotation.x = THREE.MathUtils.degToRad((degTilt || 90) - 90);
+                headPanPivot.rotation.y = THREE.MathUtils.degToRad((degPan || 70) - 70); // Inversé
+                headTiltPivot.rotation.x = THREE.MathUtils.degToRad(100 - (degTilt || 100));
             }
 
             // 8-9. Paupières (20=ouverte, 80=fermée)
             if(typeof eyelidLeftMesh !== 'undefined' && typeof eyelidRightMesh !== 'undefined') {
-                const eyeLNorm = ((degEyeL || 20) - 20) / 60;
-                const eyeRNorm = ((degEyeR || 20) - 20) / 60;
+                const eyeLNorm = Math.max(0, Math.min(1, (degEyeL || 0) / 90));
+                const eyeRNorm = Math.max(0, Math.min(1, (180 - (degEyeR || 180)) / 90));
                 eyelidLeftMesh.rotation.x = (Math.PI / 2) + (eyeLNorm * (Math.PI / 1.8));
                 eyelidRightMesh.rotation.x = (Math.PI / 2) + (eyeRNorm * (Math.PI / 1.8));
             }
@@ -627,9 +733,9 @@
             const worldPos = new THREE.Vector3();
             tipMarker.getWorldPosition(worldPos);
 
-            document.getElementById('coord-x').innerText = `X (Devant)  : ${worldPos.z.toFixed(1)} cm`;
-            document.getElementById('coord-y').innerText = `Y (Latéral) : ${(-worldPos.x).toFixed(1)} cm`;
-            document.getElementById('coord-z').innerText = `Z (Hauteur) : ${worldPos.y.toFixed(1)} cm`;
+            if(document.getElementById('coord-x')) document.getElementById('coord-x').innerText = `X (Devant)  : ${worldPos.z.toFixed(1)} cm`;
+            if(document.getElementById('coord-y')) document.getElementById('coord-y').innerText = `Y (Latéral) : ${(-worldPos.x).toFixed(1)} cm`;
+            if(document.getElementById('coord-z')) document.getElementById('coord-z').innerText = `Z (Hauteur) : ${worldPos.y.toFixed(1)} cm`;
 
             checkCollision();
         }
@@ -642,8 +748,8 @@
             const badge = document.getElementById('safety-badge');
             if (!badge) return false;
 
-            // 1. Protection Sol : Pince >= 0.8 cm (Y dans Three.js)
-            if (tipPos.y < 0.8) {
+            // 1. Protection Sol : Pince >= GROUND_TOL_CM (Z=0 = contact avec le sol)
+            if (tipPos.y < GROUND_TOL_CM) {
                 badge.style.background = '#4a1515';
                 badge.style.borderColor = '#d32f2f';
                 badge.style.color = '#ff8a80';
@@ -680,11 +786,13 @@
 
         function updateArmPlacement() {
             // Monté définitivement sur support horizontal avant fixé au seau à 15 cm du sol
-            armMountBracket.position.set(0, 15.0, 14.5);
+            armMountBracket.position.set(0, SHOULDER_PIVOT_HEIGHT - L_BASE, MOUNT_FORWARD_CM);
             armMountBracket.rotation.set(0, 0, 0);
         }
 
         function onSliderMove(jointIndex, val) {
+            fetch(`/action/servo/${jointIndex}/${val}`);
+            try { addLog(`Moteur ${jointIndex}: ${val}°`); } catch(e){}
             const prev = currentAngles[jointIndex];
             targetAngles[jointIndex] = parseFloat(val);
             currentAngles[jointIndex] = parseFloat(val);
@@ -703,12 +811,17 @@
         }
 
         function setGripper(angle) {
+            if(angle < 50) fetch(`/action/open_gripper`);
+            else fetch(`/action/close_gripper`);
+            try { addLog(angle < 50 ? 'Pince: Ouverte' : 'Pince: Fermée'); } catch(e){}
             const newAngles = [...currentAngles];
             newAngles[5] = angle;
             applyPoseAngles(newAngles);
         }
 
         function applyPose(name) {
+            fetch(`/action/${name}`);
+            try { addLog(`Bras: Pose ${name.toUpperCase()}`); } catch(e){}
             if (POSES[name]) {
                 applyPoseAngles(POSES[name]);
             }
@@ -722,29 +835,33 @@
         }
 
         function triggerBlink() {
+            fetch(`/action/blink`);
+            try { addLog(`Tête: Clin d'oeil`); } catch(e){}
             // Fermer les yeux
-            targetAngles[8] = 80;
-            targetAngles[9] = 80;
+            targetAngles[8] = 90;
+            targetAngles[9] = 90;
             update3DModel(targetAngles);
-            document.getElementById('slider-8').value = 80;
-            document.getElementById('slider-9').value = 80;
+            if(document.getElementById('slider-8')) document.getElementById('slider-8').value = 90;
+            if(document.getElementById('slider-9')) document.getElementById('slider-9').value = 90;
             
             // Rouvrir après un court instant
             setTimeout(() => {
-                targetAngles[8] = 20;
-                targetAngles[9] = 20;
+                targetAngles[8] = 0;
+                targetAngles[9] = 180;
                 update3DModel(targetAngles);
-                document.getElementById('slider-8').value = 20;
-                document.getElementById('slider-9').value = 20;
+                if(document.getElementById('slider-8')) document.getElementById('slider-8').value = 0;
+                if(document.getElementById('slider-9')) document.getElementById('slider-9').value = 180;
             }, 200);
         }
 
         function triggerSleep() {
+            fetch(`/action/park`);
+            try { addLog(`Système: Dodo`); } catch(e){}
             // Fermer les yeux et baisser la tête
-            targetAngles[6] = 90;  // Pan neutre
-            targetAngles[7] = 110; // Tilt bas
-            targetAngles[8] = 80;  // Fermée
-            targetAngles[9] = 80;  // Fermée
+            targetAngles[6] = 70;  // Pan neutre
+            targetAngles[7] = 70; // Tilt bas (inférieur à 100)
+            targetAngles[8] = 90; // Fermeée
+            targetAngles[9] = 90; // Fermeée
             applyPoseAngles(targetAngles);
         }
 
@@ -806,6 +923,8 @@
         }
 
         function startDrive(cmd) {
+            fetch('/action/' + cmd);
+            try { addLog('Moteur: ' + cmd.toUpperCase()); } catch(e){}
             driveDir = cmd;
             if (cmd === 'forward' || cmd === 'backward') {
                 if (!isDrivingStraight) {
@@ -818,6 +937,8 @@
         }
 
         function stopDrive() {
+            fetch('/action/stop');
+            try { addLog('Moteur: STOP'); } catch(e){}
             driveDir = null;
             isDrivingStraight = false;
         }
@@ -937,7 +1058,7 @@
         setInterval(async () => {
             if (window.location.protocol.startsWith('http')) {
                 try {
-                    const res = await fetch('arm_sim_state.json?t=' + Date.now());
+                    const res = await fetch('/arm_sim_state.json?t=' + Date.now());
                     if (res.ok) {
                         const data = await res.json();
                         if (data.timestamp && data.timestamp !== lastSyncTime) {
@@ -955,12 +1076,72 @@
                     // Serveur local non actif ou fichier absent
                 }
             }
-        }, 150);
+        }, 1000);
 
         // Initialisation
         updateArmPlacement();
         update3DModel(currentAngles);
         animate();
-    </script>
+    
+
+</script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

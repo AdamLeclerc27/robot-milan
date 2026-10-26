@@ -53,6 +53,38 @@ class FaceMemory:
         print(f"[FaceMemory] Visage de {name} enregistré avec succès.")
         return True
 
+    def has_name(self, name):
+        """Vrai si 'name' est present dans la base de visages (comparaison insensible a la casse)."""
+        wanted = name.strip().lower()
+        return any(n.strip().lower() == wanted for n in self.known_names)
+
+    def locate_known_face(self, bgr_image, name):
+        """Retourne la boite du visage de 'name' dans l'image (cx, cy, area, box_2d), ou None."""
+        if not FACE_REC_AVAILABLE or not self.known_encodings or not self.has_name(name):
+            return None
+        rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
+        h, w = bgr_image.shape[:2]
+        boxes = face_recognition.face_locations(rgb_image)
+        if not boxes:
+            return None
+        encodings = face_recognition.face_encodings(rgb_image, boxes)
+        wanted = name.strip().lower()
+        for (top, right, bottom, left), encoding in zip(boxes, encodings):
+            matches = face_recognition.compare_faces(self.known_encodings, encoding, tolerance=0.5)
+            if not any(matches):
+                continue
+            names = [self.known_names[i].strip().lower() for i, m in enumerate(matches) if m]
+            if wanted in names:
+                y0, x0, y1, x1 = top, left, bottom, right
+                return {
+                    "found": True,
+                    "cx": int((x0 + x1) / 2.0 / w * 1000),
+                    "cy": int((y0 + y1) / 2.0 / h * 1000),
+                    "area": float((x1 - x0) * (y1 - y0)),
+                    "box_2d": [int(y0 / h * 1000), int(x0 / w * 1000), int(y1 / h * 1000), int(x1 / w * 1000)],
+                }
+        return None
+
     def identify_faces(self, bgr_image):
         if not FACE_REC_AVAILABLE or not self.known_encodings:
             return []

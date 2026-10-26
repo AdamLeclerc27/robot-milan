@@ -7,3 +7,6 @@ milan_memory.json
 *.log
 *.wav
 *.mp3
+
+# Fichiers de tests et scripts ponctuels (hors suivi git)
+.test/

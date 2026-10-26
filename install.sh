@@ -4,22 +4,7 @@ echo "========================================="
 echo "   Installation de Milan 2 (Raspberry)   "
 echo "========================================="
 
-# 1. Installation de Ollama (Cerveau local IA)
-echo "-> Installation de Ollama..."
-if ! command -v ollama &> /dev/null
-then
-    curl -fsSL https://ollama.com/install.sh | sh
-    echo "-> Téléchargement du modèle de vision (llama3.2-vision) - Cela peut prendre plusieurs minutes..."
-    # On le lance en arrière-plan pour qu'il soit prêt (Ollama doit être lancé en service)
-    sudo systemctl enable ollama
-    sudo systemctl start ollama
-    sleep 5
-    ollama pull llama3.2-vision
-else
-    echo "-> Ollama est déjà installé."
-fi
-
-# 2. Mise à jour et installation des paquets système
+# 1. Mise à jour et installation des paquets système
 echo "-> Installation des dépendances système..."
 sudo apt-get update
 sudo apt-get install -y python3-pip python3-venv python3-dev git ffmpeg i2c-tools python3-pyaudio portaudio19-dev libasound2-dev alsa-utils python3-opencv python3-numpy python3-gpiozero swig liblgpio-dev
@@ -35,45 +20,46 @@ fi
 echo "-> Installation des modules Python..."
 $VENV_DIR/bin/pip install -r requirements.txt
 
-# Optionnel mais recommandé : cmake et face_recognition
+# 4. Reconnaissance faciale : dlib + face_recognition (utilisé par robot_face.py, compilation longue)
 echo "-> Installation de la reconnaissance faciale (Compilation de dlib, cela prendra ~10 minutes)..."
 sudo apt-get install -y build-essential cmake pkg-config libx11-dev libopenblas-dev libgtk-3-dev libboost-python-dev
 $VENV_DIR/bin/pip install dlib face_recognition
 
-# 4. Création du service Systemd pour lancer au démarrage
+# 5. Création du service Systemd pour lancer au démarrage
 echo "-> Création du service de démarrage..."
 APP_DIR=$(pwd)
 
-cat <<EOF | sudo tee /etc/systemd/system/milan-robot.service
+cat <<EOF | sudo tee /etc/systemd/system/milan-app.service
 [Unit]
-Description=Robot Milan 2 - Service Unifie (Web + IA)
-After=network.target sound.target
+Description=Milan 2 - API et Controleurs (Flask)
+After=network.target
 
 [Service]
-ExecStart=$VENV_DIR/bin/python $APP_DIR/milan.py
+ExecStart=$VENV_DIR/bin/python $APP_DIR/app.py
 WorkingDirectory=$APP_DIR
 StandardOutput=inherit
 StandardError=inherit
 Restart=always
 User=milan
-Environment="PYTHONUNBUFFERED=1"
+EnvironmentFile=/etc/environment
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Nettoyage des vieux services obsolètes
-sudo systemctl stop milan-app.service 2>/dev/null || true
-sudo systemctl disable milan-app.service 2>/dev/null || true
-sudo systemctl stop milan-wakeword.service 2>/dev/null || true
-sudo systemctl disable milan-wakeword.service 2>/dev/null || true
+# Sécurité moteurs : mise des broches GPIO des roues à l'arrêt quand le service s'arrête
+sudo mkdir -p /etc/systemd/system/milan-app.service.d
+cat <<EOF | sudo tee /etc/systemd/system/milan-app.service.d/motors-safe.conf
+[Service]
+ExecStopPost=/usr/bin/pinctrl set 17,18,22,23 op dl
+EOF
 
-# 5. Activation du nouveau service
+# 6. Activation du service
 sudo systemctl daemon-reload
-sudo systemctl enable milan-robot.service
+sudo systemctl enable milan-app.service
 
 echo "========================================="
 echo " Installation terminée ! "
 echo " Pour démarrer immédiatement :"
-echo " sudo systemctl start milan-robot.service"
+echo " sudo systemctl start milan-app.service"
 echo "========================================="

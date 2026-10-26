@@ -20,6 +20,11 @@ HEAD_RADIUS = 0.100        # 10.0 cm : rayon de protection de la tête (avec web
 HEAD_Z_MIN = 0.420         # 42 cm
 HEAD_Z_MAX = 0.620         # 62 cm (sommet du Jabra)
 
+# Choix de l'utilisateur : protection corps et tête DESACTIVEES temporairement (valeurs a redefinir).
+# La protection sol reste active. Passer ces drapeaux a True pour reactiver les controles.
+BODY_PROTECTION_ENABLED = False
+HEAD_PROTECTION_ENABLED = False
+
 
 def compute_arm_forward_kinematics(angles: List[float]) -> List[Tuple[float, float, float]]:
     """
@@ -91,10 +96,12 @@ def compute_arm_forward_kinematics(angles: List[float]) -> List[Tuple[float, flo
     return [p0, p1, p2, p3, p4]
 
 
-def is_pose_safe(angles: List[float]) -> Tuple[bool, str]:
+def is_pose_safe(angles: List[float], allow_head_zone: bool = False) -> Tuple[bool, str]:
     """
     Vérifie si une pose est 100% sécurisée (aucun contact sol, corps ou tête).
     Retourne (True, "OK") ou (False, raison_du_blocage).
+    allow_head_zone=True : ignore UNIQUEMENT la zone tête (pose de prise au sol validée physiquement,
+    où la pince passe sous la webcam). Les contrôles sol et corps restent actifs.
     """
     # 1. Vérification des limites articulaires brutes
     for i in range(min(len(angles), 6)):
@@ -114,24 +121,24 @@ def is_pose_safe(angles: List[float]) -> Tuple[bool, str]:
 
         # B. Protection Corps (Seau de 5 gal)
         # Note : P0 et P1 sont sur la platine de fixation, donc on teste les segments P2, P3, P4
-        if i >= 2 and (BODY_Z_MIN <= z <= BODY_Z_MAX):
+        if BODY_PROTECTION_ENABLED and i >= 2 and (BODY_Z_MIN <= z <= BODY_Z_MAX):
             if radius < BODY_RADIUS:
                 return False, f"Collision Corps (5 gal) : {labels[i]} trop près du seau (r={radius*100:.1f} cm < {BODY_RADIUS*100:.1f} cm)"
 
         # C. Protection Tête / Webcam / Jabra (Seau de 1 gal)
-        if i >= 2 and (HEAD_Z_MIN <= z <= HEAD_Z_MAX):
+        if HEAD_PROTECTION_ENABLED and i >= 2 and (HEAD_Z_MIN <= z <= HEAD_Z_MAX) and not allow_head_zone:
             if radius < HEAD_RADIUS:
                 return False, f"Collision Tête : {labels[i]} trop près de la tête (r={radius*100:.1f} cm < {HEAD_RADIUS*100:.1f} cm)"
 
     return True, "OK"
 
 
-def clamp_to_safe_trajectory(current: List[float], target: List[float]) -> List[float]:
+def clamp_to_safe_trajectory(current: List[float], target: List[float], allow_head_zone: bool = False) -> List[float]:
     """
     Si la cible viole une zone interdite, trouve le point le plus proche sécurisé
     en effectuant un repli progressif vers la dernière position sûre.
     """
-    safe, reason = is_pose_safe(target)
+    safe, reason = is_pose_safe(target, allow_head_zone=allow_head_zone)
     if safe:
         return target
 
@@ -143,7 +150,7 @@ def clamp_to_safe_trajectory(current: List[float], target: List[float]) -> List[
     for _ in range(8):
         alpha = (low + high) / 2.0
         candidate = [current[i] + (target[i] - current[i]) * alpha for i in range(len(target))]
-        candidate_safe, _ = is_pose_safe(candidate)
+        candidate_safe, _ = is_pose_safe(candidate, allow_head_zone=allow_head_zone)
         if candidate_safe:
             best_safe = candidate
             low = alpha

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Contrôleur intelligent et fluide pour bras robotique 6-DOF (Milan 2).
 Gère :
 - Le pilotage I2C PCA9685 (avec bascule automatique en mode simulation sur PC)
@@ -28,6 +28,10 @@ try:
     IKPY_AVAILABLE = True
 except ImportError:
     IKPY_AVAILABLE = False
+
+
+# Vitesse articulaire maximale (deg/s) : au-dela, le bras s'agite et use les servos.
+MAX_JOINT_DEG_PER_S = 45.0
 
 
 class MockServo:
@@ -140,7 +144,7 @@ class RobotArm:
         max_ang = ARM_LIMITS[channel]["max"]
         return max(min_ang, min(max_ang, float(angle)))
 
-    def move_joints(self, target_angles: Union[Dict[int, float], List[float]], duration: float = 1.2, steps: int = 30):
+    def move_joints(self, target_angles: Union[Dict[int, float], List[float]], duration: float = 1.2, steps: int = 30, allow_head_zone: bool = False):
         """
         Déplace tous les servos de façon SYNCHRONISÉE et FLUIDE (S-Curve)
         avec VÉRIFICATION ACTIVE ANTI-COLLISION (Sol, Corps, Tête).
@@ -160,10 +164,10 @@ class RobotArm:
         current_list = [self.current_angles[i] for i in range(6)]
         target_list = [clamped_targets.get(i, self.current_angles[i]) for i in range(6)]
 
-        safe, reason = is_pose_safe(target_list)
+        safe, reason = is_pose_safe(target_list, allow_head_zone=allow_head_zone)
         if not safe:
             print(f"[RobotArm SÉCURITÉ] 🛡️ {reason} -> Trajectoire bridée à la zone sécurisée.")
-            safe_targets = clamp_to_safe_trajectory(current_list, target_list)
+            safe_targets = clamp_to_safe_trajectory(current_list, target_list, allow_head_zone=allow_head_zone)
             for i in range(6):
                 clamped_targets[i] = safe_targets[i]
 
@@ -172,6 +176,10 @@ class RobotArm:
         if not clamped_targets:
             return
 
+        # Vitesse maximale par articulation : protege les servos MG996R (mouvement brusque = usure/surchauffe).
+        max_delta = max(abs(clamped_targets[ch] - start_positions[ch]) for ch in clamped_targets)
+        duration = max(duration, max_delta / MAX_JOINT_DEG_PER_S)
+        steps = max(steps, int(duration / 0.03))  # au moins une commande toutes les 30 ms
         dt = duration / max(steps, 1)
 
         # Interpolation progressive S-Curve (Cosine Easing) :
@@ -211,6 +219,25 @@ class RobotArm:
         except Exception:
             pass
 
+    def move_joint_direct(self, channel: int, angle: float):
+        """Déplacement instantané pour les curseurs manuels (évite les saccades)."""
+        target = self.clamp_angle(channel, angle)
+        if self.kit and not self.simulation:
+            try:
+                self.kit.servo[channel].angle = target
+            except: pass
+        self.current_angles[channel] = target
+
+    def move_to_pose_calibrated(self, pose_name: str, duration: float = 1.2):
+        """Pose de prise CALIBREE validee physiquement (ex: 'grab_ready').
+        Seule la zone tete est ignoree (la pince passe sous la webcam) ; sol et corps restent controles."""
+        if pose_name not in ARM_POSES:
+            print(f"[RobotArm] Pose inconnue : '{pose_name}'.")
+            return False
+        print(f"[RobotArm] Pose calibree : '{pose_name}' (zone tete autorisee, sol/corps controles).")
+        self.move_joints(ARM_POSES[pose_name], duration=duration, allow_head_zone=True)
+        return True
+
     def move_to_pose(self, pose_name: str, duration: float = 1.2):
         """Déplace le bras vers une pose prédéfinie (ex: 'park', 'home', 'ground_grab')."""
         if pose_name not in ARM_POSES:
@@ -247,10 +274,10 @@ class RobotArm:
             ik_angles_rad = self.chain.inverse_kinematics(target_vector)
             
             # Conversion en degrés avec offsets et corrections de sens
-            base_deg = ARM_LIMITS[0]["home"] + math.degrees(ik_angles_rad[1])
-            shoulder_deg = 180.0 - (90.0 + math.degrees(ik_angles_rad[2]))
-            elbow_deg = 180.0 - (90.0 + math.degrees(ik_angles_rad[3]))
-            wrist_deg = 90.0 + math.degrees(ik_angles_rad[4])
+            base_deg = 123 + math.degrees(ik_angles_rad[1])
+            shoulder_deg = 105 - math.degrees(ik_angles_rad[2])
+            elbow_deg = 10 + math.degrees(ik_angles_rad[3])
+            wrist_deg = 120 - math.degrees(ik_angles_rad[4])
 
             targets = {
                 0: base_deg,
@@ -280,3 +307,7 @@ class RobotArm:
             ang = self.current_angles[i]
             print(f" Canal {i} [{name:8s}] : {ang:5.1f}° (min={ARM_LIMITS[i]['min']}°, max={ARM_LIMITS[i]['max']}°)")
         print("---------------------------\n")
+
+
+
+

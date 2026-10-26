@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Milan 2 - Camera de pince</title>
+    <style>
+        body { background: #111; color: #eee; font-family: sans-serif; margin: 0; padding: 16px; }
+        h1 { font-size: 20px; margin: 0 0 8px 0; }
+        .info { font-size: 14px; color: #aaa; margin-bottom: 12px; }
+        .frame { display: inline-block; border: 2px solid #333; background: #000; }
+        img { display: block; width: 640px; max-width: 100%; height: auto; }
+        .btns { margin: 12px 0; }
+        button { padding: 6px 12px; margin-right: 8px; font-size: 14px; cursor: pointer; }
+        #still { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Camera de pince (mini camera au bout du bras)</h1>
+    <div class="info">
+        Flux en direct : /video_feed_claw (320x240, MJPG). Pour verifier le cadrage, place la fleche devant la pince
+        et regarde si elle est visible entre les machoires.
+    </div>
+    <div class="frame">
+        <img id="live" src="/video_feed_claw" alt="Flux camera de pince">
+        <img id="still" alt="Image figee camera de pince">
+    </div>
+    <div class="btns">
+        <button onclick="freeze()">Figer l'image</button>
+        <button onclick="live()">Reprendre le direct</button>
+        <a href="/"><button>Camera tete (bascule)</button></a>
+    </div>
+    <script>
+        function freeze() {
+            document.getElementById('still').src = '/snapshot_claw.jpg?t=' + Date.now();
+            document.getElementById('still').style.display = 'block';
+            document.getElementById('live').style.display = 'none';
+        }
+        function live() {
+            document.getElementById('still').style.display = 'none';
+            document.getElementById('live').style.display = 'block';
+            document.getElementById('live').src = '/video_feed_claw?t=' + Date.now();
+        }
+    </script>
+</body>
+</html>
