@@ -20,6 +20,10 @@ fi
 echo "-> Installation des modules Python..."
 $VENV_DIR/bin/pip install -r requirements.txt
 
+# Cinematique inverse du bras (ikpy + numpy/scipy requis par ikpy)
+echo "-> Installation de la cinematique inverse du bras (ikpy)..."
+$VENV_DIR/bin/pip install "ikpy==4.2.1" numpy scipy
+
 # 4. Reconnaissance faciale : dlib + face_recognition (utilisé par robot_face.py, compilation longue)
 echo "-> Installation de la reconnaissance faciale (Compilation de dlib, cela prendra ~10 minutes)..."
 sudo apt-get install -y build-essential cmake pkg-config libx11-dev libopenblas-dev libgtk-3-dev libboost-python-dev

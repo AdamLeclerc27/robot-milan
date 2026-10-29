@@ -766,8 +766,8 @@ class PickAndDepositMission:
 
         # Pose de prise CALIBREE (grab_ready : X=25 cm, Y=0, Z=0). Pas d'estimation de base.
         # Le chassis a deja ete oriente vers la cible : la base reste sur la pose calibree.
-        grab_pose = ARM_POSES["grab_ready"]
-        print(f"[MISSION] Descente vers la pose de prise calibree {grab_pose} pour {target_name} (cx={last_cx}, cy={last_cy})...", flush=True)
+        # Pose de prise : l'ancienne 'grab_ready' n'existe plus. La saisie part de la pose park (a recalibrer).
+        print(f"[MISSION] Descente vers la pose park pour {target_name} (cx={last_cx}, cy={last_cy}) ; prise a recalibrer.", flush=True)
         self.arm.open_gripper(duration=0.4)
         time.sleep(0.2)
         from grab_sequence import run_grab_sequence
@@ -837,7 +837,7 @@ class PickAndDepositMission:
             self.play_tts(f"J'ai bien saisi {_art(target_name)} {target_name} ! Je la transporte vers {_art(destination_name)} {destination_name}.")
         else:
             self.play_tts(f"J'ai bien saisi {_art(target_name)} {target_name} ! Je la garde dans ma pince.")
-        self.arm.move_to_pose("carry", duration=1.0)
+        self.arm.move_to_pose("park", duration=1.0)
         time.sleep(0.3)
         return True
 
@@ -851,7 +851,7 @@ class PickAndDepositMission:
         if is_person:
             print(f"[MISSION] Remise de {_art(target_name)} {target_name} a {destination_name}...", flush=True)
             self.play_tts(f"Voila {destination_name} ! Je te donne {_art(target_name)} {target_name}.")
-            self.arm.move_to_pose("forward_reach", duration=1.2)
+            self.arm.move_to_pose("park", duration=1.2)
             time.sleep(0.6)
             self.arm.open_gripper(duration=0.6)
             time.sleep(0.6)

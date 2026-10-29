@@ -197,24 +197,31 @@
             <span style="color: #00ff88; font-weight: bold;">Hauteur = 15 cm</span>
         </div>
 
-        <div id="safety-badge" style="background:#14291c; border: 1px solid #2e7d32; border-radius: 8px; padding: 8px 12px; font-size: 0.8rem; color:#81c784; display: flex; align-items: center; justify-content: center; text-align: center; transition: all 0.2s ease;">
-            🛡️ Protection Anti-Collision active (Sol & Corps protégés)
-        </div>
-
         <div class="section-title">📍 Poses Clés Indispensables</div>
         <div class="pose-grid">
-            <button class="btn btn-park" onclick="applyPose('park_compact')">📦 PARK (Plaqué au corps)</button>
-            <button class="btn btn-grab" onclick="applyPose('ground_grab')">🎯 RAMASSER SOL (15-20cm)</button>
-            <button class="btn" style="background:#283593; border-color:#3949ab;" onclick="applyPose('eye_level')">👀 HAUTEUR YEUX / TÊTE (50cm)</button>
-            <button class="btn" onclick="applyPose('forward_reach')">👉 TENDRE DEVANT (Mi-corps)</button>
-            <button class="btn" onclick="applyPose('home')">🏠 NEUTRE (Prêt)</button>
-            <button class="btn" style="background:#424242;" onclick="applyPose('relax_down')">🛋️ BAISSÉ AU REPOS</button>
+            <button class="btn btn-park" onclick="applyPose('park')">📦 PARK (base 180 · épaule 65 · coude 115 · poignet 180)</button>
         </div>
 
         <div class="section-title">🤏 Contrôle Pince</div>
         <div class="pose-grid">
             <button class="btn" onclick="setGripper(20)">👐 Ouvrir (20°)</button>
             <button class="btn" onclick="setGripper(85)">✊ Fermer (85°)</button>
+        </div>
+
+        <div class="section-title">🎯 Saisie XYZ (cm)</div>
+        <div class="slider-group">
+            <div style="display:flex; gap:6px; margin-bottom:6px;">
+                <label style="flex:1; font-size:0.8rem;">X (avant)<input type="number" id="xyz-x" value="20" step="0.5" style="width:100%; padding:6px; border-radius:6px; border:1px solid #2a3a54; background:#0f141f; color:white;"></label>
+                <label style="flex:1; font-size:0.8rem;">Y (gauche +)<input type="number" id="xyz-y" value="5" step="0.5" style="width:100%; padding:6px; border-radius:6px; border:1px solid #2a3a54; background:#0f141f; color:white;"></label>
+                <label style="flex:1; font-size:0.8rem;">Z (haut)<input type="number" id="xyz-z" value="5" step="0.5" style="width:100%; padding:6px; border-radius:6px; border:1px solid #2a3a54; background:#0f141f; color:white;"></label>
+            </div>
+            <div class="pose-grid">
+                <button class="btn" onclick="moveXYZ()">📍 Aller en X/Y/Z</button>
+                <button class="btn" style="background:#2e7d32;" onclick="grabXYZ()">🤏 Saisir à X/Y/Z</button>
+                <button class="btn" onclick="setGripper(20)">👐 Ouvrir pince</button>
+                <button class="btn" onclick="setGripper(90)">✊ Serrer pince</button>
+            </div>
+            <div id="xyz-status" style="font-size:0.8rem; color:#8fa3bf; margin-top:6px;">Prêt.</div>
         </div>
 
         <div class="section-title">🚗 Déplacement & Ligne Droite (Anti-Banane)</div>
@@ -288,33 +295,33 @@
             <div class="slider-row">
                 <div class="slider-header">
                     <span>Base (Tourelle Z)</span>
-                    <span id="val-0" class="val">123°</span>
+                    <span id="val-0" class="val">90°</span>
                 </div>
-                <input type="range" id="slider-0" min="0" max="180" value="123" oninput="onSliderMove(0, this.value)">
+                <input type="range" id="slider-0" min="0" max="180" value="90" oninput="onSliderMove(0, this.value)">
             </div>
 
             <div class="slider-row">
                 <div class="slider-header">
                     <span>Épaule (Pitch Y)</span>
-                    <span id="val-1" class="val">20°</span>
+                    <span id="val-1" class="val">90°</span>
                 </div>
-                <input type="range" id="slider-1" min="0" max="110" value="20" oninput="onSliderMove(1, this.value)">
+                <input type="range" id="slider-1" min="0" max="180" value="90" oninput="onSliderMove(1, this.value)">
             </div>
 
             <div class="slider-row">
                 <div class="slider-header">
                     <span>Coude (Pitch Y)</span>
-                    <span id="val-2" class="val">115°</span>
+                    <span id="val-2" class="val">90°</span>
                 </div>
-                <input type="range" id="slider-2" min="0" max="150" value="115" oninput="onSliderMove(2, this.value)">
+                <input type="range" id="slider-2" min="0" max="180" value="90" oninput="onSliderMove(2, this.value)">
             </div>
 
             <div class="slider-row">
                 <div class="slider-header">
                     <span>Poignet (Pitch Y)</span>
-                    <span id="val-3" class="val">117°</span>
+                    <span id="val-3" class="val">90°</span>
                 </div>
-                <input type="range" id="slider-3" min="20" max="180" value="117" oninput="onSliderMove(3, this.value)">
+                <input type="range" id="slider-3" min="0" max="180" value="90" oninput="onSliderMove(3, this.value)">
             </div>
 
             <div class="slider-row">
@@ -334,7 +341,7 @@
             </div>
         </div>
 
-        <div class="section-title">📐 Position Pince estimée (X, Y, Z)</div>
+        <div class="section-title">📐 Position Pointe de pince (cm, repère tourelle)</div>
         <div class="coords-box">
             <div id="coord-x">X (Avant) : 0.0 cm</div>
             <div id="coord-y">Y (Latéral) : 0.0 cm</div>
@@ -417,34 +424,27 @@
                 input.value = '';
             }
         }
-        // Cotes réelles en cm (Milan 2 ROT3U)
-        const L_BASE = 8.0;      // 8 cm
-        const L_SHOULDER = 10.0; // 10 cm
-        const L_ELBOW = 10.0;    // 10 cm
-        const L_WRIST = 8.0;     // 8 cm
-        // --- Calibration mesuree sur le robot reel (pose de prise validee [123,19,61,47,90,3]) ---
-        // L'axe de l'epaule est a 15 cm du sol (et non la base du support). Pince prete a saisir : X=25 cm, Y=0, Z=0.
-        const SHOULDER_PIVOT_HEIGHT = 15.0; // cm : hauteur reelle de l'axe d'epaule
-        const MOUNT_FORWARD_CM = 13.04;     // cm : avance du bras / axe du robot (ajustee sur X=25)
-        const TIP_OFFSET_CM = 4.88;         // cm : point de saisie au-dela de la base de pince (ajuste sur Z=0)
-        const GROUND_TOL_CM = -0.5;         // cm : tolerance sous le sol avant butee (la pince peut toucher Z=0)
+        // Cotes en cm : MEMES valeurs que arm_kinematics.py (source unique de verite).
+        // Convention : servo 90 = position de reference (voir arm_kinematics.py).
+        const SHOULDER_PIVOT_HEIGHT = 15.0; // cm : axe de la tourelle / epaule au-dessus de la surface
+        const L_BASE = 0.0;                 // le segment tourelle->epaule est nul (l'epaule est sur l'axe)
+        const L_SHOULDER = 10.0;            // epaule -> coude
+        const L_ELBOW = 10.0;               // coude -> poignet
+        const L_WRIST = 9.68;               // poignet -> pointe : 9.68 cm (longueur reelle de la pince)
+        // Position de l'axe de la tourelle DANS LA SCENE, par rapport au centre du seau (cm, +Z = avant).
+// Le repere de calcul (arm_kinematics) reste centre sur la tourelle ; ce decalage ne sert qu'au placement visuel.
+const MOUNT_FORWARD_CM = 7.5;      // le bras est monte sur l'avant du seau (ajuster si le montage differe)
+        const TIP_OFFSET_CM = 9.68;         // pointe de la pince, a L_WRIST_TIP du poignet
 
         // Poses préconfigurées validées (Fixation Torse à 15 cm)
         // Format: [Base, Épaule, Coude, Poignet, Roll, Pince, Pan, Tilt, OeilG, OeilD]
+        // Poses : MEMES valeurs que arm_config.ARM_POSES (source unique). Le champ tete/yeux est garde a part.
         const POSES = {
-    park:          [180, 110, 150, 40, 152, 88, 70, 70, 0, 180],
-    park_compact:  [180, 110, 150, 40, 152, 88, 70, 70, 0, 180],
-    ground_grab:   [122, 33, 96, 52, 90, 0, 70, 70, 0, 180],
-    eye_level:     [122, 80, 70, 90, 90, 80, 70, 100, 0, 180],
-    observe:       [122, 80, 70, 90, 90, 15, 70, 100, 0, 180],
-    forward_reach: [122, 50, 115, 117, 90, 30, 70, 100, 0, 180],
-    home:          [122, 20, 115, 117, 90, 15, 70, 100, 0, 180],
-    relax_down:    [122, 110, 70, 70, 90, 20, 70, 70, 90, 90],
-    carry:         [122, 40, 110, 110, 90, 80, 70, 100, 0, 180]
+    park:               [180, 65, 115, 180, 90, 15, 70, 100, 0, 180]
 };
 
         // Angles de départ (position neutre prête)
-        let currentAngles = [122, 20, 115, 117, 90, 15, 70, 100, 0, 180];
+        let currentAngles = [90, 65, 115, 180, 90, 15, 70, 100, 0, 180];
         let targetAngles = [...currentAngles];
         let animating = false;
         let animProgress = 1.0;
@@ -615,9 +615,7 @@
         const armBaseGroup = new THREE.Group();
         armMountBracket.add(armBaseGroup);
 
-        const basePillar = new THREE.Mesh(new THREE.CylinderGeometry(4, 5, L_BASE, 32), matAluminumDark);
-        basePillar.position.y = L_BASE / 2;
-        armBaseGroup.add(basePillar);
+
 
         // Pivot Épaule (Joint 1 - Rotation Y)
         const shoulderPivot = new THREE.Group();
@@ -657,13 +655,14 @@
         const wristRollPivot = new THREE.Group();
         wristPitchPivot.add(wristRollPivot);
 
-        const wristArm = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, L_WRIST * 0.6, 16), matAluminumDark);
-        wristArm.position.y = (L_WRIST * 0.6) / 2;
+        // Segment de pince : du poignet jusqu'a la pointe (L_WRIST = 9.68 cm)
+        const wristArm = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, L_WRIST, 16), matAluminumDark);
+        wristArm.position.y = L_WRIST / 2;
         wristRollPivot.add(wristArm);
 
-        // Base de la Pince
+        // Base de la Pince : a l'extremite du segment, les doigts restent sur la pointe
         const gripperBase = new THREE.Group();
-        gripperBase.position.y = L_WRIST * 0.6;
+        gripperBase.position.y = L_WRIST;
         wristRollPivot.add(gripperBase);
 
         const gripperMount = new THREE.Mesh(new THREE.BoxGeometry(5, 1.5, 3), matAluminumDark);
@@ -684,7 +683,8 @@
             new THREE.SphereGeometry(0.6, 16, 16),
             new THREE.MeshBasicMaterial({ color: 0x00ff88 })
         );
-        tipMarker.position.set(0, TIP_OFFSET_CM, 0);
+        // La pointe est au bout de la pince : gripperBase est place a L_WRIST, le marqueur est a 0 dans son repere
+        tipMarker.position.set(0, 0, 0);
         gripperBase.add(tipMarker);
 
         // -------------------------------------------------------------
@@ -693,17 +693,19 @@
         function update3DModel(angles) {
             const [degBase, degShoulder, degElbow, degWrist, degRoll, degGripper, degPan, degTilt, degEyeL, degEyeR] = angles;
 
-            // 0. Base : 123 = Devant (0 rad 3D)
-            armBaseGroup.rotation.y = THREE.MathUtils.degToRad(degBase - 123);
+            // CONVENTION COMMUNE avec arm_kinematics.py : servo 90 = position de reference.
+            // 0. Base : 90 = bras dans le plan avant (0 rad 3D), 180 = gauche
+            armBaseGroup.rotation.y = THREE.MathUtils.degToRad(degBase - 90);
 
-            // 1. Épaule (Pitch X) : 110 = Haut (0 rad 3D)
-            shoulderPivot.rotation.x = THREE.MathUtils.degToRad(105 - degShoulder);
+            // Signe verifie contre arm_kinematics (test de cohérence) : +(servo - 90).
+            // 1. Epaule : 90 = bras-haut vertical ; > 90 = penche vers l'avant
+            shoulderPivot.rotation.x = THREE.MathUtils.degToRad(degShoulder - 90);
 
-            // 2. Coude (Pitch X) : 115 = 90° relatif
-            elbowPivot.rotation.x = THREE.MathUtils.degToRad(degElbow - 10);
+            // 2. Coude (relatif a l'epaule) : 90 = avant-bras dans l'axe
+            elbowPivot.rotation.x = THREE.MathUtils.degToRad(degElbow - 90);
 
-            // 3. Poignet Pitch : 117 = 90° relatif
-            wristPitchPivot.rotation.x = THREE.MathUtils.degToRad(120 - degWrist);
+            // 3. Poignet (relatif au coude) : 90 = pince dans l'axe
+            wristPitchPivot.rotation.x = THREE.MathUtils.degToRad(degWrist - 90);
 
             // 4. Poignet Roll : 90 = neutre
             wristRollPivot.rotation.y = THREE.MathUtils.degToRad(90 - degRoll);
@@ -728,60 +730,54 @@
                 eyelidRightMesh.rotation.x = (Math.PI / 2) + (eyeRNorm * (Math.PI / 1.8));
             }
 
-            // Coordonnées mondiales du bout de la pince
-            tipMarker.updateMatrixWorld();
-            const worldPos = new THREE.Vector3();
-            tipMarker.getWorldPosition(worldPos);
-
-            if(document.getElementById('coord-x')) document.getElementById('coord-x').innerText = `X (Devant)  : ${worldPos.z.toFixed(1)} cm`;
-            if(document.getElementById('coord-y')) document.getElementById('coord-y').innerText = `Y (Latéral) : ${(-worldPos.x).toFixed(1)} cm`;
-            if(document.getElementById('coord-z')) document.getElementById('coord-z').innerText = `Z (Hauteur) : ${worldPos.y.toFixed(1)} cm`;
-
-            checkCollision();
         }
 
-        function checkCollision() {
-            tipMarker.updateMatrixWorld();
-            const tipPos = new THREE.Vector3();
-            tipMarker.getWorldPosition(tipPos);
+        // Affiche la position de la pince calculee par ikpy (cinematique du bras reel)
+        let xyzRequestPending = false;
+        function refreshXYZ() {
+            if (xyzRequestPending) return;
+            xyzRequestPending = true;
+            fetch('/arm/xyz.json?t=' + Date.now()).then(r => r.json()).then(d => {
+                if (d && d.ok) {
+                    document.getElementById('coord-x').innerText = `X (Avant) : ${d.x.toFixed(1)} cm`;
+                    document.getElementById('coord-y').innerText = `Y (Latéral) : ${d.y.toFixed(1)} cm`;
+                    document.getElementById('coord-z').innerText = `Z (Hauteur) : ${d.z.toFixed(1)} cm`;
+                }
+            }).catch(() => {}).finally(() => { xyzRequestPending = false; });
+        }
 
-            const badge = document.getElementById('safety-badge');
-            if (!badge) return false;
-
-            // 1. Protection Sol : Pince >= GROUND_TOL_CM (Z=0 = contact avec le sol)
-            if (tipPos.y < GROUND_TOL_CM) {
-                badge.style.background = '#4a1515';
-                badge.style.borderColor = '#d32f2f';
-                badge.style.color = '#ff8a80';
-                badge.innerHTML = `⚠️ <b>BUTÉE SOL :</b> Pince bloquée au ras du sol (${tipPos.y.toFixed(1)} cm) !`;
-                return true;
+        function readXYZInputs() {
+            const x = parseFloat(document.getElementById('xyz-x').value);
+            const y = parseFloat(document.getElementById('xyz-y').value);
+            const z = parseFloat(document.getElementById('xyz-z').value);
+            if ([x, y, z].some(v => Number.isNaN(v))) {
+                document.getElementById('xyz-status').innerText = '⚠️ Valeurs X/Y/Z invalides.';
+                return null;
             }
+            return { x, y, z };
+        }
 
-            // 2. Protection Corps : Seau de 5 gal
-            const r = Math.sqrt(tipPos.x * tipPos.x + tipPos.z * tipPos.z);
-            if (tipPos.y >= 5.0 && tipPos.y <= 42.0 && r < 14.0) {
-                badge.style.background = '#4a2810';
-                badge.style.borderColor = '#f57c00';
-                badge.style.color = '#ffcc80';
-                badge.innerHTML = `⚠️ <b>BUTÉE CORPS :</b> Collision seau 5 gal évitée !`;
-                return true;
-            }
+        function moveXYZ() {
+            const p = readXYZInputs();
+            if (!p) return;
+            document.getElementById('xyz-status').innerText = `⏳ Déplacement vers X=${p.x}, Y=${p.y}, Z=${p.z} cm...`;
+            fetch(`/arm/move_xyz/${p.x}/${p.y}/${p.z}`).then(r => r.json()).then(d => {
+                document.getElementById('xyz-status').innerText = d.ok ? '✅ Mouvement lancé.' : `❌ ${d.erreur || 'erreur'}`;
+                if (!d.ok) { return; }
+                addLog(`Bras: Aller en X=${p.x} Y=${p.y} Z=${p.z}`);
+                setTimeout(refreshXYZ, 1800);
+            }).catch(() => { document.getElementById('xyz-status').innerText = '❌ Serveur injoignable.'; });
+        }
 
-            // 3. Protection Tête / Webcam
-            if (tipPos.y > 42.0 && tipPos.y <= 62.0 && r < 9.5) {
-                badge.style.background = '#4a2810';
-                badge.style.borderColor = '#f57c00';
-                badge.style.color = '#ffcc80';
-                badge.innerHTML = `⚠️ <b>BUTÉE TÊTE :</b> Collision webcam / tête évitée !`;
-                return true;
-            }
-
-            // Statut nominal
-            badge.style.background = '#14291c';
-            badge.style.borderColor = '#2e7d32';
-            badge.style.color = '#81c784';
-            badge.innerHTML = '🛡️ Protection Anti-Collision active (Sol & Corps protégés)';
-            return false;
+        function grabXYZ() {
+            const p = readXYZInputs();
+            if (!p) return;
+            document.getElementById('xyz-status').innerText = `⏳ Saisie en cours à X=${p.x}, Y=${p.y}, Z=${p.z} cm...`;
+            fetch(`/arm/grab_xyz/${p.x}/${p.y}/${p.z}`).then(r => r.json()).then(d => {
+                document.getElementById('xyz-status').innerText = d.ok ? '✅ Séquence de saisie lancée (ouverture → approche → serrage → remontée).' : `❌ ${d.erreur || 'erreur'}`;
+                addLog(`Bras: Saisie à X=${p.x} Y=${p.y} Z=${p.z}`);
+                setTimeout(refreshXYZ, 4000);
+            }).catch(() => { document.getElementById('xyz-status').innerText = '❌ Serveur injoignable.'; });
         }
 
         function updateArmPlacement() {
@@ -793,26 +789,14 @@
         function onSliderMove(jointIndex, val) {
             fetch(`/action/servo/${jointIndex}/${val}`);
             try { addLog(`Moteur ${jointIndex}: ${val}°`); } catch(e){}
-            const prev = currentAngles[jointIndex];
             targetAngles[jointIndex] = parseFloat(val);
             currentAngles[jointIndex] = parseFloat(val);
             update3DModel(currentAngles);
-
-            if (checkCollision()) {
-                // Revenir au dernier angle sûr si collision
-                targetAngles[jointIndex] = prev;
-                currentAngles[jointIndex] = prev;
-                document.getElementById(`slider-${jointIndex}`).value = Math.round(prev);
-                document.getElementById(`val-${jointIndex}`).innerText = `${Math.round(prev)}°`;
-                update3DModel(currentAngles);
-            } else {
-                document.getElementById(`val-${jointIndex}`).innerText = `${val}°`;
-            }
+            document.getElementById(`val-${jointIndex}`).innerText = `${val}°`;
         }
 
         function setGripper(angle) {
-            if(angle < 50) fetch(`/action/open_gripper`);
-            else fetch(`/action/close_gripper`);
+            fetch(`/arm/gripper/${angle}`);
             try { addLog(angle < 50 ? 'Pince: Ouverte' : 'Pince: Fermée'); } catch(e){}
             const newAngles = [...currentAngles];
             newAngles[5] = angle;
@@ -820,7 +804,10 @@
         }
 
         function applyPose(name) {
-            fetch(`/action/${name}`);
+            // La pose est envoyee au bras (route /arm/pose) ET animee dans le simulateur
+            fetch(`/arm/pose/${name}`).then(r => r.json()).then(d => {
+                if (!d.ok) { try { addLog(`Pose refusee : ${d.erreur}`); } catch(e){} }
+            }).catch(() => { try { addLog('Pose : serveur injoignable'); } catch(e){} });
             try { addLog(`Bras: Pose ${name.toUpperCase()}`); } catch(e){}
             if (POSES[name]) {
                 applyPoseAngles(POSES[name]);
@@ -1077,6 +1064,9 @@
                 }
             }
         }, 1000);
+
+        // Position de la pince (ikpy, serveur) rafraîchie 2 fois par seconde, sans saturer le serveur
+        setInterval(refreshXYZ, 500);
 
         // Initialisation
         updateArmPlacement();

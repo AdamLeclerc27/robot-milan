@@ -344,11 +344,12 @@ def execute_hardware_action(cmd):
         elif cmd == 'wake_up':
             head.wake_up()
         elif cmd == 'park':
-            try: arm.move_to_pose("park_compact")
+            try: arm.move_to_pose("park")
             except: pass
             head.sleep_mode()
-        elif cmd in ['home', 'park_compact', 'ground_grab', 'eye_level', 'observe', 'forward_reach', 'relax_down', 'carry']:
-            try: arm.move_to_pose(cmd)
+        elif cmd in ['home', 'park_compact']:
+            # Anciennes poses : toutes remplacees par la pose park
+            try: arm.move_to_pose("park")
             except: pass
         elif cmd == 'open_gripper':
             try: arm.open_gripper()
@@ -514,7 +515,7 @@ def ask_laptop_brain(user_query):
             "R??gles :\n"
             "- 'attend_reponse' : 'true' UNIQUEMENT si tu poses une question et attends une r??ponse imm??diate.\n"
             "- 'learn_face' : utilise cette action (avec 'name') si on te pr??sente explicitement quelqu'un.\n"
-            "- Actions possibles : 'forward', 'backward', 'left', 'right', 'stop', 'look_forward', 'look_ground', 'blink', 'wake_up', 'home', 'park', 'ground_grab', 'carry', 'open_gripper', 'close_gripper', 'pick_and_deposit'.\n"
+            "- Actions possibles : 'forward', 'backward', 'left', 'right', 'stop', 'look_forward', 'look_ground', 'blink', 'wake_up', 'park', 'open_gripper', 'close_gripper', 'pick_and_deposit'.\n"
         )
         
         history_text = "Historique r??cent :\n"
@@ -983,6 +984,75 @@ def action_distance(meters):
             drive.drive_distance(meters, speed=0.5)
     threading.Thread(target=_run, daemon=True).start()
     return jsonify({"ok": True, "demarre": True, "cible_m": meters}), 202
+
+@app.route('/arm/xyz.json')
+def arm_xyz_state():
+    # Position de la POINTE de pince (cm, repere tourelle) a partir des angles servo courants (arm_kinematics)
+    try:
+        xyz = arm.forward_xyz()
+        if xyz is None:
+            return jsonify({"ok": False, "erreur": "cinematique indisponible"}), 503
+        return jsonify({"ok": True, "x": round(xyz[0], 2), "y": round(xyz[1], 2), "z": round(xyz[2], 2)})
+    except Exception as e:
+        return jsonify({"ok": False, "erreur": str(e)}), 500
+
+@app.route('/arm/move_xyz/<x>/<y>/<z>')
+def arm_move_xyz(x, y, z):
+    # Deplace la pince vers (X, Y, Z) en cm. Accepte les entiers et les decimaux (ex: 20 ou 20.5).
+    try:
+        x, y, z = float(x), float(y), float(z)
+    except ValueError:
+        return jsonify({"ok": False, "erreur": "X/Y/Z doivent etre des nombres"}), 400
+    if arm.chain is None:
+        return jsonify({"ok": False, "erreur": "cinematique indisponible"}), 503
+    # Calcul IK AVANT le mouvement : une cible inatteignable est signalee, rien ne bouge
+    targets = arm.ik_servo_angles(x, y, max(z, 0.0))
+    if targets is None:
+        return jsonify({"ok": False, "erreur": f"Cible X={x}, Y={y}, Z={z} cm inatteignable"}), 422
+    def _run():
+        with hardware_lock:
+            arm.move_joints(targets, duration=1.2)
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"ok": True, "cible_cm": [x, y, z], "cibles_servo": {str(k): round(v, 1) for k, v in targets.items()}}), 202
+
+@app.route('/arm/grab_xyz/<x>/<y>/<z>')
+def arm_grab_xyz(x, y, z):
+    # Sequence de saisie : ouvrir la pince, aller en (X, Y, Z), serrer, remonter de 8 cm
+    try:
+        x, y, z = float(x), float(y), float(z)
+    except ValueError:
+        return jsonify({"ok": False, "erreur": "X/Y/Z doivent etre des nombres"}), 400
+    if arm.chain is None:
+        return jsonify({"ok": False, "erreur": "cinematique indisponible"}), 503
+    # Verification IK de la cible ET de la remontee avant tout mouvement
+    if arm.ik_servo_angles(x, y, max(z, 0.0)) is None or arm.ik_servo_angles(x, y, max(z, 0.0) + 8.0) is None:
+        return jsonify({"ok": False, "erreur": f"Saisie impossible : X={x}, Y={y}, Z={z} cm inatteignable"}), 422
+    def _run():
+        with hardware_lock:
+            arm.grab_xyz(x, y, z)
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"ok": True, "cible_cm": [x, y, z], "demarre": True}), 202
+
+@app.route('/arm/pose/<name>')
+def arm_pose(name):
+    # Pose de ARM_POSES (angles servo). Les poses inconnues sont refusees explicitement.
+    from arm_config import ARM_POSES
+    if name not in ARM_POSES:
+        return jsonify({"ok": False, "erreur": f"pose inconnue : {name}", "poses": list(ARM_POSES.keys())}), 404
+    def _run():
+        with hardware_lock:
+            arm.move_joints(ARM_POSES[name], duration=1.2)
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"ok": True, "pose": name, "angles": ARM_POSES[name]}), 202
+
+@app.route('/arm/gripper/<angle>')
+def arm_gripper(angle):
+    # Pince : 20 = ouverte, 90 = fermee (bornes de ARM_LIMITS[5])
+    try:
+        arm.move_joint_direct(5, float(angle))
+        return jsonify({"ok": True, "angle": arm.current_angles[5]})
+    except Exception as e:
+        return jsonify({"ok": False, "erreur": str(e)}), 500
 
 @app.route('/action/<cmd>')
 def action(cmd):

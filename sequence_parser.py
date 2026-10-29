@@ -137,9 +137,9 @@ def match_single_reflex(clause: str):
     if re.search(r'^(reveille toi|debout|reveil|bonjour)$', c):
         return ("Bonjour ! Je suis réveillé !", {"action": "wake_up", "duration": 1.0})
     if re.search(r'^(leve le bras|bras en l air|bras haut|porte)$', c):
-        return ("Je lève le bras.", {"action": "carry", "duration": 1.2})
+        return ("Je range mon bras.", {"action": "park", "duration": 1.2})
     if re.search(r'^(baisse le bras|bras au sol|bras vers le bas)$', c):
-        return ("Bras au sol.", {"action": "ground_grab", "duration": 1.2})
+        return ("Je range mon bras.", {"action": "park", "duration": 1.2})
 
     return None
 
@@ -221,8 +221,8 @@ _FALLBACK_KEYWORDS = [
     (r"\b(ouvre|lache|relache)\b.*\b(pince|main)\b|\b(lache|relache)\b", {"action": "open_gripper", "duration": 0.5}, "J'ouvre la pince."),
     (r"\b(ferme|serre)\b.*\b(pince|main)\b", {"action": "close_gripper", "duration": 0.5}, "Je ferme la pince."),
     (r"\b(range|replie|repos)\b.*\b(bras)\b|\bbras au repos\b", {"action": "park", "duration": 1.2}, "Je range mon bras."),
-    (r"\b(leve|porte)\b.*\b(bras)\b", {"action": "carry", "duration": 1.2}, "Je lève le bras."),
-    (r"\b(baisse|descends)\b.*\b(bras)\b", {"action": "ground_grab", "duration": 1.2}, "Bras au sol."),
+    (r"\b(leve|porte)\b.*\b(bras)\b", {"action": "park", "duration": 1.2}, "Je range mon bras."),
+    (r"\b(baisse|descends)\b.*\b(bras)\b", {"action": "park", "duration": 1.2}, "Je range mon bras."),
     (r"\b(regarde|tete)\b.*\b(sol|bas|terre)\b", {"action": "look_ground", "duration": 0.8}, "Je regarde le sol."),
     (r"\b(regarde|tete)\b.*\b(devant|droit)\b", {"action": "look_forward", "duration": 0.8}, "Je regarde droit devant."),
 ]
